@@ -1,0 +1,82 @@
+{
+  "endpoint": "https://api.uk2.cliniko.com/v1/appointments",
+  "params": {
+    "from": "2025-07-29",
+    "to": "2025-08-05",
+    "business_id": "1740586889502532285",
+    "practitioner_id": "1740586886222586607"
+  },
+  "response": {
+    "appointments": [
+      {
+        "appointment_end": "2025-07-29T09:15:00Z",
+        "appointment_start": "2025-07-29T08:30:00Z",
+        "archived_at": null,
+        "booking_ip_address": null,
+        "cancellation_note": null,
+        "cancellation_reason": null,
+        "cancellation_time": null,
+        "cancelled_at": null,
+        "conflicts": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/appointments/1740764234985251763/conflicts"
+          }
+        },
+        "created_at": "2025-07-29T19:07:47Z",
+        "deleted_at": null,
+        "did_not_arrive": false,
+        "email_reminder_sent": false,
+        "ends_at": "2025-07-29T09:15:00Z",
+        "id": "1740764234985251763",
+        "invoice_status": null,
+        "notes": null,
+        "online_booking_policy_accepted": null,
+        "patient_arrived": false,
+        "patient_name": "Test Test",
+        "repeat_rule": {},
+        "repeats": null,
+        "sms_reminder_sent": false,
+        "starts_at": "2025-07-29T08:30:00Z",
+        "treatment_note_status": null,
+        "updated_at": "2025-07-29T19:07:47Z",
+        "appointment_type": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586889158598690"
+          }
+        },
+        "business": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/businesses/1740586889502532285"
+          }
+        },
+        "practitioner": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607"
+          }
+        },
+        "patient": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/patients/1740764234012172834"
+          }
+        },
+        "attendees": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/appointments/1740764234985251763/attendees"
+          }
+        },
+        "invoices": {
+          "links": {
+            "self": "https://api.uk2.cliniko.com/v1/appointments/1740764234985251763/invoices"
+          }
+        },
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointments/1740764234985251763"
+        }
+      }
+    ],
+    "total_entries": 1,
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/appointments?page=1"
+    }
+  }
+}

@@ -1,0 +1,316 @@
+# PHYSIO CHAT SYSTEM - Multi-Tenant Enterprise Environment Configuration
+# Copy this file to .env and fill in your values
+
+# =======================================================
+# SECURITY CONFIGURATION (CRITICAL - MUST BE CHANGED)
+# =======================================================
+MASTER_PASSWORD=your-very-secure-master-password-here-at-least-32-chars
+SESSION_SECRET=your-session-secret-at-least-64-chars-random
+JWT_SECRET=your-jwt-secret-for-authentication-at-least-64-chars
+
+# =======================================================
+# AI/LLM CONFIGURATION (REQUIRED FOR WEBHOOK API)
+# =======================================================
+OPENAI_API_KEY=your-openai-api-key-here
+
+# =======================================================
+# MULTI-TENANT DATABASE CONFIGURATION
+# =======================================================
+DATABASE_PATH=./data/multi-tenant.db
+DATABASE_ENCRYPTION_ENABLED=true
+DATABASE_BACKUP_ENABLED=true
+DATABASE_BACKUP_INTERVAL_HOURS=24
+
+# =======================================================
+# SERVER CONFIGURATION
+# =======================================================
+PORT=3000
+DASHBOARD_PORT=3001
+NODE_ENV=production
+API_BASE_URL=http://localhost:3000
+DASHBOARD_BASE_URL=http://localhost:3001
+
+# =======================================================
+# AUTHENTICATION & AUTHORIZATION
+# =======================================================
+# JWT Configuration
+JWT_ACCESS_TOKEN_EXPIRY=1h
+JWT_REFRESH_TOKEN_EXPIRY=7d
+JWT_ISSUER=physio-chat-system
+
+# Session Configuration
+SESSION_TIMEOUT_MINUTES=60
+MAX_LOGIN_ATTEMPTS=5
+ACCOUNT_LOCKOUT_DURATION_MINUTES=30
+
+# MFA Configuration
+MFA_ENABLED=true
+MFA_ISSUER=Physio Chat System
+MFA_WINDOW=2
+
+# Password Policy
+PASSWORD_MIN_LENGTH=12
+PASSWORD_REQUIRE_UPPERCASE=true
+PASSWORD_REQUIRE_LOWERCASE=true
+PASSWORD_REQUIRE_NUMBERS=true
+PASSWORD_REQUIRE_SPECIAL_CHARS=true
+PASSWORD_MAX_AGE_DAYS=90
+PASSWORD_PREVENT_REUSE=5
+
+# =======================================================
+# HIPAA COMPLIANCE CONFIGURATION
+# =======================================================
+# Enable HIPAA features
+HIPAA_ENABLED=true
+HIPAA_AUDIT_RETENTION_YEARS=7
+HIPAA_MINIMUM_NECESSARY_ENFORCEMENT=true
+HIPAA_EMERGENCY_ACCESS_ENABLED=true
+
+# BAA (Business Associate Agreement) Requirements
+BAA_REQUIRED=true
+BAA_EXPIRY_WARNING_DAYS=30
+BAA_ANNUAL_REVIEW_REQUIRED=true
+
+# PHI Access Controls
+PHI_ENCRYPTION_REQUIRED=true
+PHI_ACCESS_LOGGING_DETAILED=true
+PHI_BREACH_NOTIFICATION_ENABLED=true
+PHI_MINIMUM_NECESSARY_DEFAULT=true
+
+# =======================================================
+# GDPR COMPLIANCE CONFIGURATION
+# =======================================================
+# Enable GDPR features
+GDPR_ENABLED=true
+GDPR_DATA_RETENTION_DAYS=365
+GDPR_REQUEST_RESPONSE_DAYS=30
+GDPR_AUTO_DELETE_EXPIRED=true
+
+# Data Subject Rights
+GDPR_RIGHT_TO_ACCESS=true
+GDPR_RIGHT_TO_PORTABILITY=true
+GDPR_RIGHT_TO_ERASURE=true
+GDPR_RIGHT_TO_RECTIFICATION=true
+
+# Breach Notification
+GDPR_BREACH_NOTIFICATION_HOURS=72
+GDPR_HIGH_RISK_THRESHOLD=100
+GDPR_AUTO_BREACH_DETECTION=true
+
+# =======================================================
+# DATA SOVEREIGNTY & ENCRYPTION
+# =======================================================
+# Data Residency
+DEFAULT_DATA_RESIDENCY=US
+CROSS_BORDER_TRANSFER_ALLOWED=false
+ADEQUACY_DECISION_REQUIRED=true
+
+# Encryption Settings
+ENCRYPTION_AT_REST_ALGORITHM=AES-256-GCM
+ENCRYPTION_KEY_ROTATION_DAYS=90
+CUSTOMER_MANAGED_KEYS=false
+
+# TLS Configuration
+MIN_TLS_VERSION=1.3
+CERTIFICATE_VALIDATION=true
+PERFECT_FORWARD_SECRECY=true
+
+# =======================================================
+# AUDIT & MONITORING
+# =======================================================
+# Audit Configuration
+AUDIT_LOG_RETENTION_DAYS=2555  # 7 years
+AUDIT_LOG_ENCRYPTION=true
+AUDIT_LOG_INTEGRITY_CHECKS=true
+AUDIT_LOG_TAMPER_DETECTION=true
+
+# Real-time Monitoring
+REAL_TIME_MONITORING=true
+SECURITY_ALERT_ENABLED=true
+COMPLIANCE_MONITORING=true
+SUSPICIOUS_ACTIVITY_DETECTION=true
+
+# Log Levels
+LOG_LEVEL=info
+SECURITY_LOG_LEVEL=debug
+COMPLIANCE_LOG_LEVEL=debug
+
+# =======================================================
+# RATE LIMITING & SECURITY
+# =======================================================
+# API Rate Limits (per minute)
+API_RATE_LIMIT_PER_MINUTE=100
+AUTH_RATE_LIMIT_PER_MINUTE=10
+GDPR_REQUEST_RATE_LIMIT_PER_DAY=5
+
+# Security Headers
+HELMET_ENABLED=true
+CORS_ENABLED=true
+CORS_ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3000
+
+# IP Security
+IP_WHITELIST_ENABLED=false
+IP_WHITELIST=
+IP_BLACKLIST_ENABLED=true
+IP_BLACKLIST=
+
+# =======================================================
+# TENANT DEFAULT CONFIGURATION
+# =======================================================
+# Default tenant limits
+DEFAULT_MAX_CLINICS=5
+DEFAULT_MAX_USERS=25
+DEFAULT_MAX_CONVERSATIONS_PER_MONTH=10000
+DEFAULT_MAX_STORAGE_GB=10
+DEFAULT_MAX_API_CALLS_PER_HOUR=1000
+
+# Default subscription
+DEFAULT_SUBSCRIPTION_PLAN=starter
+DEFAULT_TRIAL_DURATION_DAYS=14
+
+# Default compliance settings
+DEFAULT_JURISDICTION=US
+DEFAULT_HIPAA_REQUIRED=true
+DEFAULT_GDPR_REQUIRED=false
+DEFAULT_ENCRYPTION_LEVEL=standard
+
+# =======================================================
+# FALLBACK CLINIC CONFIGURATION
+# =======================================================
+FALLBACK_CLINIC_NAME=Demo Physiotherapy Clinic
+FALLBACK_CLINIC_EMAIL=info@demo-clinic.com
+FALLBACK_CLINIC_PHONE=+1-555-123-4567
+FALLBACK_CLINIC_ADDRESS=123 Health Street, Demo City, DC 12345
+FALLBACK_CLINIC_TIMEZONE=America/New_York
+FALLBACK_CLINIC_SERVICES=General Consultation,Follow-up Appointment
+FALLBACK_CLINIC_BOOKING_SYSTEM=cliniko
+
+# =======================================================
+# NOTIFICATION CONFIGURATION
+# =======================================================
+# Email Configuration
+SMTP_HOST=your-smtp-host
+SMTP_PORT=587
+SMTP_SECURE=true
+SMTP_USER=your-email@domain.com
+SMTP_PASS=your-email-password
+
+# Notification Settings
+SECURITY_ALERTS_ENABLED=true
+COMPLIANCE_REPORTS_ENABLED=true
+BREACH_NOTIFICATIONS_ENABLED=true
+SYSTEM_ALERTS_ENABLED=true
+
+# Notification Recipients
+SECURITY_ALERT_EMAIL=security@your-domain.com
+COMPLIANCE_ALERT_EMAIL=compliance@your-domain.com
+TECHNICAL_ALERT_EMAIL=tech@your-domain.com
+
+# =======================================================
+# INTEGRATION CONFIGURATION
+# =======================================================
+# Webhook Configuration
+WEBHOOK_TIMEOUT_SECONDS=30
+WEBHOOK_RETRY_ATTEMPTS=3
+WEBHOOK_SIGNATURE_VERIFICATION=true
+
+# External Service URLs
+COMPLIANCE_REPORTING_URL=
+SECURITY_MONITORING_URL=
+BACKUP_SERVICE_URL=
+
+# =======================================================
+# DEVELOPMENT & TESTING
+# =======================================================
+# Development settings (set to false in production)
+DEVELOPMENT_MODE=false
+DEBUG_ENABLED=false
+MOCK_EXTERNAL_SERVICES=false
+
+# Testing configuration
+TEST_TENANT_ENABLED=false
+TEST_USER_AUTO_CREATE=false
+CYPRESS_TESTING_ENABLED=false
+
+# =======================================================
+# BACKUP & DISASTER RECOVERY
+# =======================================================
+# Backup Configuration
+BACKUP_ENABLED=true
+BACKUP_FREQUENCY_HOURS=6
+BACKUP_RETENTION_DAYS=30
+BACKUP_ENCRYPTION_ENABLED=true
+
+# Cloud Storage (if using cloud backups)
+CLOUD_BACKUP_ENABLED=false
+CLOUD_STORAGE_PROVIDER=aws
+CLOUD_STORAGE_BUCKET=
+CLOUD_STORAGE_REGION=us-east-1
+
+# Disaster Recovery
+DR_ENABLED=false
+DR_FAILOVER_THRESHOLD_MINUTES=5
+DR_BACKUP_REGION=us-west-2
+
+# =======================================================
+# PERFORMANCE & SCALING
+# =======================================================
+# Cache Configuration
+REDIS_ENABLED=false
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# Database Connection Pool
+DB_CONNECTION_POOL_SIZE=10
+DB_CONNECTION_TIMEOUT_SECONDS=30
+DB_QUERY_TIMEOUT_SECONDS=60
+
+# CDN Configuration
+CDN_ENABLED=false
+CDN_URL=
+STATIC_ASSETS_CDN=false
+
+# =======================================================
+# MONITORING & ANALYTICS
+# =======================================================
+# Application Performance Monitoring
+APM_ENABLED=false
+APM_SERVICE_NAME=physio-chat-system
+APM_ENVIRONMENT=production
+
+# Analytics
+ANALYTICS_ENABLED=false
+ANALYTICS_PROVIDER=
+ANALYTICS_TRACKING_ID=
+
+# Health Checks
+HEALTH_CHECK_ENABLED=true
+HEALTH_CHECK_INTERVAL_SECONDS=30
+HEALTH_CHECK_TIMEOUT_SECONDS=5
+
+# =======================================================
+# FEATURE FLAGS
+# =======================================================
+# Multi-tenant Features
+CONVERSATION_PERSISTENCE=true
+MULTIPLE_BOOKING_SYSTEMS=true
+ADVANCED_ANALYTICS=false
+CUSTOM_BRANDING=false
+SSO_INTEGRATION=false
+API_ACCESS=true
+WEBHOOKS_ENABLED=true
+REALTIME_MONITORING=true
+
+# Compliance Features
+AUTOMATED_COMPLIANCE_REPORTS=true
+GDPR_REQUEST_AUTOMATION=true
+HIPAA_AUDIT_AUTOMATION=true
+BREACH_DETECTION_AI=false
+
+# Advanced Security
+BEHAVIORAL_ANALYTICS=false
+THREAT_INTELLIGENCE=false
+ZERO_TRUST_ARCHITECTURE=false
+ADVANCED_ENCRYPTION=false 
+

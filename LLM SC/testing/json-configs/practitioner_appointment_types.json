@@ -1,0 +1,98 @@
+{
+  "appointment_types": [
+    {
+      "add_deposit_to_account_credit": null,
+      "appointment_confirmation_template_ids": [],
+      "appointment_follow_up_template_ids": [],
+      "appointment_reminder_template_ids": [],
+      "archived_at": null,
+      "category": null,
+      "color": "#B8D9FF",
+      "created_at": "2025-07-29T13:15:26Z",
+      "deposit_price": null,
+      "description": null,
+      "duration_in_minutes": 30,
+      "id": "1740586888823054369",
+      "max_attendees": 1,
+      "name": "Standard Appointment",
+      "online_bookings_lead_time_hours": null,
+      "online_payments_enabled": false,
+      "online_payments_mode": null,
+      "show_in_online_bookings": true,
+      "telehealth_enabled": false,
+      "updated_at": "2025-07-29T19:19:25Z",
+      "billable_item": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/billable_items/1740586888781111958"
+        }
+      },
+      "appointment_type_billable_items": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_type_billable_items?q%5B%5D=appointment_type_id%3A%3D1740586888823054369"
+        }
+      },
+      "appointment_type_products": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_type_products?q%5B%5D=appointment_type_id%3A%3D1740586888823054369"
+        }
+      },
+      "practitioners": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586888823054369/practitioners"
+        }
+      },
+      "links": {
+        "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586888823054369"
+      }
+    },
+    {
+      "add_deposit_to_account_credit": null,
+      "appointment_confirmation_template_ids": [],
+      "appointment_follow_up_template_ids": [],
+      "appointment_reminder_template_ids": [],
+      "archived_at": null,
+      "category": null,
+      "color": "#FDCA86",
+      "created_at": "2025-07-29T13:15:26Z",
+      "deposit_price": null,
+      "description": null,
+      "duration_in_minutes": 45,
+      "id": "1740586889158598690",
+      "max_attendees": 1,
+      "name": "First Appointment",
+      "online_bookings_lead_time_hours": null,
+      "online_payments_enabled": false,
+      "online_payments_mode": null,
+      "show_in_online_bookings": true,
+      "telehealth_enabled": false,
+      "updated_at": "2025-07-29T17:57:16Z",
+      "billable_item": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/billable_items/1740586889125044887"
+        }
+      },
+      "appointment_type_billable_items": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_type_billable_items?q%5B%5D=appointment_type_id%3A%3D1740586889158598690"
+        }
+      },
+      "appointment_type_products": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_type_products?q%5B%5D=appointment_type_id%3A%3D1740586889158598690"
+        }
+      },
+      "practitioners": {
+        "links": {
+          "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586889158598690/practitioners"
+        }
+      },
+      "links": {
+        "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586889158598690"
+      }
+    }
+  ],
+  "total_entries": 2,
+  "links": {
+    "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607/appointment_types?page=1"
+  }
+}

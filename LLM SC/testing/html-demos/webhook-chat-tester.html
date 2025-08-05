@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Chat Tester - Physio AI</title>
+    <!-- Add marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+            height: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .chat-section {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .log-section {
+            background: #1a1a1a;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .log-header {
+            background: #2d2d2d;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            position: relative;
+        }
+        
+        .message.user .message-content {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .message.ai .message-content {
+            background: white;
+            border: 2px solid #e9ecef;
+            color: #333;
+        }
+        
+        .message-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Markdown Styling */
+        .markdown-content {
+            line-height: 1.6;
+        }
+        
+        .markdown-content strong {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .markdown-content ul {
+            margin: 8px 0;
+            padding-left: 0;
+        }
+        
+        .markdown-content li {
+            display: flex;
+            align-items: flex-start;
+            margin: 4px 0;
+            list-style: none;
+        }
+        
+        .markdown-content li:before {
+            content: "•";
+            color: #4facfe;
+            font-weight: bold;
+            margin-right: 8px;
+            margin-top: 1px;
+        }
+        
+        .markdown-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .markdown-content ol li:before {
+            content: none;
+        }
+        
+        .markdown-content code {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        
+        .markdown-content blockquote {
+            border-left: 4px solid #4facfe;
+            background: rgba(79, 172, 254, 0.1);
+            margin: 12px 0;
+            padding: 12px 16px;
+            border-radius: 0 4px 4px 0;
+            font-style: italic;
+        }
+        
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            margin: 12px 0 8px 0;
+            font-weight: 600;
+        }
+        
+        .markdown-content h1 { font-size: 1.2em; }
+        .markdown-content h2 { font-size: 1.1em; }
+        .markdown-content h3 { font-size: 1.05em; }
+        
+        .markdown-content p {
+            margin: 6px 0;
+        }
+        
+        .chat-input-section {
+            padding: 20px;
+            background: white;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .webhook-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .session-input {
+            width: 200px;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 1em;
+            resize: none;
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .logs {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+        }
+        
+        .log-entry {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #4facfe;
+            background: #2a2a2a;
+        }
+        
+        .log-timestamp {
+            color: #888;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        
+        .log-request {
+            color: #4facfe;
+            margin-bottom: 10px;
+        }
+        
+        .log-response {
+            color: #28a745;
+        }
+        
+        .log-error {
+            color: #dc3545;
+            border-left-color: #dc3545;
+        }
+        
+        .json-container {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow-x: auto;
+        }
+        
+        .status-bar {
+            padding: 10px 20px;
+            background: #2d2d2d;
+            color: white;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background: #28a745;
+        }
+        
+        .status-offline {
+            background: #dc3545;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .control-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        
+        .control-btn:hover {
+            background: #444;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .quick-messages {
+            margin-bottom: 15px;
+        }
+        
+        .quick-message-btn {
+            background: #e9ecef;
+            border: none;
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        
+        .quick-message-btn:hover {
+            background: #dee2e6;
+        }
+        
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="header">
+                <h1>🤖 Webhook Chat Tester</h1>
+                <p>Test your Physio AI webhook with real-time logging</p>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <div class="message-content">
+                        <div>👋 Welcome! I'm your Physio AI assistant. You can test booking appointments, ask about services, or get clinic information.</div>
+                        <div class="message-meta">Ready to help</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input-section">
+                <div class="input-row">
+                    <input type="text" class="webhook-input" id="webhookUrl" 
+                           placeholder="Webhook URL" 
+                           value="http://localhost:3002/webhook/webhook_300612e45c22b8b0de9b2deb91e084c9e9864988ba70ffcdaadf7bfd5a699b5f">
+                    <input type="text" class="session-input" id="sessionId" 
+                           placeholder="Session ID" 
+                           value="test-session">
+                </div>
+                
+                <div class="quick-messages">
+                    <strong>Quick Tests:</strong><br>
+                    <button class="quick-message-btn" onclick="sendQuickMessage('Can I make a booking?')">Can I make a booking?</button>
+                    <button class="quick-message-btn" onclick="sendQuickMessage('What are your opening hours?')">Opening hours?</button>
+                    <button class="quick-message-btn" onclick="sendQuickMessage('I want to book a physiotherapy appointment for John Smith, phone +44 7123 456789, next Tuesday at 3pm')">Full booking request</button>
+                    <button class="quick-message-btn" onclick="sendQuickMessage('What services do you offer?')">Services?</button>
+                </div>
+                
+                <div class="input-row">
+                    <textarea class="message-input" id="messageInput" 
+                              placeholder="Type your message here..." 
+                              rows="2"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log Section -->
+        <div class="log-section">
+            <div class="log-header">
+                <h2>📊 Request/Response Logs</h2>
+                <p>Real-time debugging information</p>
+            </div>
+            
+            <div class="status-bar">
+                <div>
+                    <span class="status-indicator status-offline" id="statusIndicator"></span>
+                    <span id="statusText">Checking connection...</span>
+                </div>
+                <div id="requestCount">Requests: 0</div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn" onclick="clearLogs()">Clear Logs</button>
+                <button class="control-btn" onclick="exportLogs()">Export Logs</button>
+                <button class="control-btn" onclick="testConnection()">Test Connection</button>
+            </div>
+            
+            <div class="logs" id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let requestCount = 0;
+        let sessionIdCounter = 1;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkWebhookStatus();
+            
+            // Auto-generate session ID
+            updateSessionId();
+            
+            // Enter key to send
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+        
+        function updateSessionId() {
+            document.getElementById('sessionId').value = `test-session-${sessionIdCounter++}`;
+        }
+        
+        async function checkWebhookStatus() {
+            try {
+                const webhookBase = getWebhookBase();
+                const response = await fetch(`${webhookBase}/health`);
+                
+                if (response.ok) {
+                    document.getElementById('statusIndicator').className = 'status-indicator status-online';
+                    document.getElementById('statusText').textContent = 'Webhook Online';
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                document.getElementById('statusIndicator').className = 'status-indicator status-offline';
+                document.getElementById('statusText').textContent = 'Webhook Offline';
+                
+                addLogEntry('error', null, null, `Connection Error: ${error.message}`);
+            }
+        }
+        
+        function getWebhookBase() {
+            const webhookUrl = document.getElementById('webhookUrl').value;
+            const urlParts = webhookUrl.split('/webhook/');
+            return urlParts[0];
+        }
+        
+        function sendQuickMessage(message) {
+            document.getElementById('messageInput').value = message;
+            sendMessage();
+        }
+        
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            const webhookUrl = document.getElementById('webhookUrl').value;
+            const sessionId = document.getElementById('sessionId').value || 'default-session';
+            
+            // Add user message to chat
+            addChatMessage('user', message);
+            
+            // Clear input and disable send button
+            messageInput.value = '';
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.innerHTML = '<span class="loading"></span>Sending...';
+            sendBtn.disabled = true;
+            
+            const requestData = {
+                message: message,
+                sessionId: sessionId,
+                userConsent: true,
+                metadata: {
+                    source: 'chat-tester',
+                    timestamp: new Date().toISOString()
+                }
+            };
+            
+            const startTime = Date.now();
+            
+            try {
+                addLogEntry('request', requestData);
+                
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const responseTime = Date.now() - startTime;
+                const responseData = await response.json();
+                
+                if (response.ok && responseData.success) {
+                    // Add AI response to chat
+                    addChatMessage('ai', responseData.data.message, {
+                        intent: responseData.data.metadata.intent,
+                        confidence: responseData.data.metadata.confidence,
+                        functionCalls: responseData.data.metadata.functionCallsExecuted,
+                        responseTime: `${responseTime}ms`
+                    });
+                    
+                    addLogEntry('response', responseData, responseTime);
+                    
+                    // Update session ID for next message
+                    updateSessionId();
+                    
+                } else {
+                    throw new Error(responseData.error?.message || `HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                
+                addChatMessage('ai', `❌ Error: ${error.message}`, {
+                    error: true,
+                    responseTime: `${responseTime}ms`
+                });
+                
+                addLogEntry('error', null, responseTime, error.message);
+            }
+            
+            // Re-enable send button
+            sendBtn.innerHTML = 'Send';
+            sendBtn.disabled = false;
+            
+            // Update request counter
+            requestCount++;
+            document.getElementById('requestCount').textContent = `Requests: ${requestCount}`;
+        }
+        
+        function addChatMessage(type, content, metadata = {}) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            let metaText = '';
+            if (metadata.intent) {
+                metaText += `Intent: ${metadata.intent} (${(metadata.confidence * 100).toFixed(1)}%) | `;
+            }
+            if (metadata.functionCalls !== undefined) {
+                metaText += `Functions: ${metadata.functionCalls} | `;
+            }
+            if (metadata.responseTime) {
+                metaText += `Time: ${metadata.responseTime}`;
+            }
+            if (metadata.error) {
+                metaText = `Error occurred | Time: ${metadata.responseTime}`;
+            }
+            
+            // Render markdown for AI responses, plain text for user messages
+            let contentHtml;
+            if (type === 'ai' && typeof marked !== 'undefined') {
+                // Configure marked for security and consistent formatting
+                marked.setOptions({
+                    breaks: true,
+                    sanitize: false, // We control the content source
+                    smartLists: true,
+                    smartypants: false
+                });
+                contentHtml = marked.parse(content);
+            } else {
+                // Escape HTML for user messages to prevent XSS
+                contentHtml = content.replace(/&/g, '&amp;')
+                                   .replace(/</g, '&lt;')
+                                   .replace(/>/g, '&gt;')
+                                   .replace(/"/g, '&quot;')
+                                   .replace(/'/g, '&#039;');
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-content ${type === 'ai' ? 'markdown-content' : ''}">
+                    <div>${contentHtml}</div>
+                    ${metaText ? `<div class="message-meta">${metaText}</div>` : ''}
+                </div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function addLogEntry(type, data, responseTime = null, errorMessage = null) {
+            const logs = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry ${type === 'error' ? 'log-error' : ''}`;
+            
+            const timestamp = new Date().toISOString();
+            let content = `<div class="log-timestamp">${timestamp}</div>`;
+            
+            if (type === 'request') {
+                content += `
+                    <div class="log-request">📤 REQUEST</div>
+                    <div class="json-container">${JSON.stringify(data, null, 2)}</div>
+                `;
+            } else if (type === 'response') {
+                content += `
+                    <div class="log-response">📥 RESPONSE (${responseTime}ms)</div>
+                    <div class="json-container">${JSON.stringify(data, null, 2)}</div>
+                `;
+            } else if (type === 'error') {
+                content += `
+                    <div class="log-error">❌ ERROR ${responseTime ? `(${responseTime}ms)` : ''}</div>
+                    <div style="color: #ff6b6b; margin-top: 5px;">${errorMessage}</div>
+                `;
+            }
+            
+            logDiv.innerHTML = content;
+            logs.appendChild(logDiv);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            requestCount = 0;
+            document.getElementById('requestCount').textContent = 'Requests: 0';
+        }
+        
+        function exportLogs() {
+            const logs = document.getElementById('logs').innerText;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `webhook-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        async function testConnection() {
+            try {
+                await checkWebhookStatus();
+                
+                const webhookBase = getWebhookBase();
+                const testUrl = `${webhookBase}/test-connection/webhook_300612e45c22b8b0de9b2deb91e084c9e9864988ba70ffcdaadf7bfd5a699b5f`;
+                
+                const response = await fetch(testUrl, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLogEntry('response', result, null);
+                    alert('✅ Connection test successful!');
+                } else {
+                    throw new Error(result.error?.message || 'Connection test failed');
+                }
+                
+            } catch (error) {
+                addLogEntry('error', null, null, `Connection test failed: ${error.message}`);
+                alert(`❌ Connection test failed: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html> 

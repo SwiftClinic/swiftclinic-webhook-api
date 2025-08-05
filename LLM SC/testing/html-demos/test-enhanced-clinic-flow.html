@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Clinic Flow Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .step {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #1e40af;
+        }
+        .pms-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pms-option:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .pms-option.selected {
+            border-color: #3b82f6;
+            background-color: #dbeafe;
+        }
+        .pms-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-right: 12px;
+        }
+        .cliniko { background-color: #3b82f6; }
+        .jane { background-color: #10b981; }
+        input, button {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        input[type="password"] {
+            width: 100%;
+            max-width: 300px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 12px 24px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .business-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+        .business-info h4 {
+            margin: 0 0 8px 0;
+        }
+        .business-details {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .shard-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #16a34a;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Enhanced Clinic Management Flow Test</h1>
+        <p>Test the new PMS selection and auto-detection flow</p>
+    </div>
+
+    <!-- Step 1: PMS Selection -->
+    <div class="step">
+        <h3>Step 1: Choose Your Practice Management System</h3>
+        <div class="pms-option" onclick="selectPMS('cliniko')">
+            <div class="pms-logo cliniko">C</div>
+            <div>
+                <strong>Cliniko</strong><br>
+                <small>Popular practice management for healthcare professionals</small>
+            </div>
+        </div>
+        <div class="pms-option" onclick="selectPMS('jane')">
+            <div class="pms-logo jane">J</div>
+            <div>
+                <strong>Jane App</strong><br>
+                <small>Modern practice management for health and wellness</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: API Key Input -->
+    <div class="step" id="apiKeyStep" style="display: none;">
+        <h3>Step 2: Enter Your API Key</h3>
+        <p id="apiKeyInstructions"></p>
+        <input type="password" id="apiKey" placeholder="Enter your API key">
+        <br>
+        <button onclick="detectConfiguration()" id="detectBtn">Auto-Detect Configuration</button>
+        <div id="detectionError"></div>
+    </div>
+
+    <!-- Step 3: Detection Results -->
+    <div class="step" id="detectionStep" style="display: none;">
+        <h3>Step 3: Select Your Business/Clinic</h3>
+        <div id="detectionResults"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="container" id="results" style="display: none;">
+        <h3>✅ Test Results</h3>
+        <div id="resultContent"></div>
+    </div>
+
+    <script>
+        let selectedPMSType = null;
+
+        function selectPMS(pmsType) {
+            selectedPMSType = pmsType;
+            
+            // Update UI
+            document.querySelectorAll('.pms-option').forEach(el => el.classList.remove('selected'));
+            event.target.closest('.pms-option').classList.add('selected');
+            
+            // Show API key step
+            document.getElementById('apiKeyStep').style.display = 'block';
+            document.getElementById('apiKeyInstructions').textContent = 
+                pmsType === 'cliniko' 
+                    ? 'Find your API key in Cliniko Settings > API Access'
+                    : 'Find your API key in Jane App Settings > Integrations';
+            
+            // Clear previous results
+            document.getElementById('detectionStep').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        async function detectConfiguration() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                showError('Please enter an API key');
+                return;
+            }
+
+            const detectBtn = document.getElementById('detectBtn');
+            detectBtn.disabled = true;
+            detectBtn.textContent = 'Detecting...';
+            
+            clearError();
+
+            try {
+                const endpoint = selectedPMSType === 'cliniko' 
+                    ? 'http://localhost:3001/api/clinics/detect-cliniko'
+                    : 'http://localhost:3001/api/clinics/detect-jane';
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showDetectionResults(data.data);
+                } else {
+                    showError(data.error?.message || 'Detection failed');
+                }
+            } catch (error) {
+                showError('Connection failed: ' + error.message);
+            } finally {
+                detectBtn.disabled = false;
+                detectBtn.textContent = 'Auto-Detect Configuration';
+            }
+        }
+
+        function showDetectionResults(data) {
+            const resultsDiv = document.getElementById('detectionResults');
+            const step = document.getElementById('detectionStep');
+            
+            let html = '';
+
+            if (selectedPMSType === 'cliniko' && data.businesses) {
+                html += `<p>Found ${data.businesses.length} business(es) on shard <span class="shard-badge">${data.shard.toUpperCase()}</span></p>`;
+                
+                data.businesses.forEach(business => {
+                    html += `
+                        <div class="business-card">
+                            <div class="business-info">
+                                <h4>${business.name}</h4>
+                                <div class="business-details">
+                                    <span>📍 ${business.country}</span>
+                                    <span>🕒 ${business.timezone}</span>
+                                    <span class="shard-badge">${data.shard.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <button onclick="addClinic('${business.id}', '${business.name}')">
+                                Add Clinic
+                            </button>
+                        </div>
+                    `;
+                });
+            } else if (selectedPMSType === 'jane' && data.clinics) {
+                html += `<p>Found ${data.clinics.length} clinic(s) under subdomain "${data.subdomain}"</p>`;
+                
+                data.clinics.forEach(clinic => {
+                    html += `
+                        <div class="business-card">
+                            <div class="business-info">
+                                <h4>${clinic.name}</h4>
+                                <div class="business-details">
+                                    ${clinic.country ? `<span>📍 ${clinic.country}</span>` : ''}
+                                    ${clinic.timezone ? `<span>🕒 ${clinic.timezone}</span>` : ''}
+                                </div>
+                            </div>
+                            <button onclick="addClinic('${clinic.id}', '${clinic.name}')">
+                                Add Clinic
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+
+            resultsDiv.innerHTML = html;
+            step.style.display = 'block';
+        }
+
+        async function addClinic(businessId, businessName) {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            try {
+                const clinicData = {
+                    name: businessName,
+                    contactInfo: {
+                        email: '',
+                        phone: '',
+                        address: ''
+                    },
+                    businessHours: {
+                        monday: { open: '09:00', close: '17:00', isOpen: true },
+                        tuesday: { open: '09:00', close: '17:00', isOpen: true },
+                        wednesday: { open: '09:00', close: '17:00', isOpen: true },
+                        thursday: { open: '09:00', close: '17:00', isOpen: true },
+                        friday: { open: '09:00', close: '17:00', isOpen: true },
+                        saturday: { open: '09:00', close: '13:00', isOpen: false },
+                        sunday: { open: '09:00', close: '13:00', isOpen: false }
+                    },
+                    services: [],
+                    bookingSystem: selectedPMSType === 'cliniko' ? 'cliniko' : 'jane-app',
+                    apiCredentials: {
+                        apiKey,
+                        ...(selectedPMSType === 'cliniko' ? {
+                            businessId
+                        } : {
+                            clinicId: businessId
+                        })
+                    },
+                    gdprSettings: {
+                        dataRetentionDays: 2555,
+                        anonymizeAfterDays: 2555,
+                        enableDataExport: true,
+                        enableDataDeletion: true
+                    },
+                    autoDetected: true
+                };
+
+                const response = await fetch('http://localhost:3001/api/clinics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(clinicData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(result.data);
+                } else {
+                    showError(result.error?.message || 'Failed to create clinic');
+                }
+            } catch (error) {
+                showError('Failed to create clinic: ' + error.message);
+            }
+        }
+
+        function showSuccess(clinicData) {
+            const resultsDiv = document.getElementById('results');
+            const content = document.getElementById('resultContent');
+            
+            content.innerHTML = `
+                <div class="success">
+                    <h4>✅ Clinic Added Successfully!</h4>
+                    <p><strong>Clinic ID:</strong> ${clinicData.id}</p>
+                    <p><strong>Name:</strong> ${clinicData.name}</p>
+                    <p><strong>Webhook URL:</strong> ${clinicData.webhookUrl}</p>
+                    <p><strong>Booking System:</strong> ${clinicData.bookingSystem}</p>
+                    <p><strong>Auto-detected:</strong> ${clinicData.autoDetected ? 'Yes' : 'No'}</p>
+                    ${clinicData.clinikoInfo ? `
+                        <p><strong>Shard:</strong> ${clinicData.clinikoInfo.shard}</p>
+                        <p><strong>Business ID:</strong> ${clinicData.clinikoInfo.businessId}</p>
+                    ` : ''}
+                    ${clinicData.janeInfo ? `
+                        <p><strong>Subdomain:</strong> ${clinicData.janeInfo.subdomain}</p>
+                        <p><strong>Clinic ID:</strong> ${clinicData.janeInfo.clinicId}</p>
+                    ` : ''}
+                    <br>
+                    <p class="text-sm text-gray-600">You can now view the clinic details to create webhooks.</p>
+                </div>
+            `;
+            
+            resultsDiv.style.display = 'block';
+        }
+
+        function showError(message) {
+            document.getElementById('detectionError').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        function clearError() {
+            document.getElementById('detectionError').innerHTML = '';
+        }
+    </script>
+</body>
+</html> 

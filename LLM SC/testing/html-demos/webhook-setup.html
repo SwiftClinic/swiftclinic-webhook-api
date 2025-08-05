@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physio Chat System - Webhook Setup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .step {
+            margin-bottom: 40px;
+            padding: 30px;
+            border: 2px solid #f0f0f0;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .step.active {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.05);
+        }
+        
+        .step.completed {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.05);
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #6c757d;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        
+        .step.active .step-number {
+            background: #4facfe;
+        }
+        
+        .step.completed .step-number {
+            background: #28a745;
+        }
+        
+        .step-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        input[type="text"], input[type="email"], input[type="tel"], select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .webhook-url {
+            background: #f8f9fa;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .webhook-url h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        
+        .webhook-url code {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+        
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .clinic-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .clinic-info h4 {
+            color: #495057;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #6c757d;
+        }
+        
+        .info-value {
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Physio Chat Setup</h1>
+            <p>Create your intelligent webhook for Cliniko integration</p>
+        </div>
+        
+        <div class="content">
+            <!-- Step 1: API Key Input -->
+            <div class="step active" id="step1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Enter Your Cliniko API Key</div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>📍 Where to find your API key:</strong><br>
+                    1. Log into your Cliniko account<br>
+                    2. Go to Settings → API Keys<br>
+                    3. Create a new API key or copy an existing one
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKey">Cliniko API Key</label>
+                    <input type="text" id="apiKey" placeholder="Enter your Cliniko API key..." />
+                </div>
+                
+                <button class="btn" onclick="detectCliniko()" id="detectBtn">
+                    🔍 Auto-Detect Clinic Settings
+                </button>
+            </div>
+            
+            <!-- Step 2: Clinic Detection Results -->
+            <div class="step hidden" id="step2">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Clinic Detection Results</div>
+                </div>
+                
+                <div id="detectionResults"></div>
+                
+                <div class="form-group">
+                    <label for="clinicName">Clinic Name</label>
+                    <input type="text" id="clinicName" value="SwiftClinic Test" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="contactEmail">Contact Email</label>
+                    <input type="email" id="contactEmail" value="info@demo-clinic.com" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="contactPhone">Contact Phone</label>
+                    <input type="tel" id="contactPhone" value="+44 1234 567890" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="contactAddress">Address</label>
+                    <input type="text" id="contactAddress" value="5 Monk Bar Court, York, YO1, United Kingdom" />
+                </div>
+                
+                <button class="btn" onclick="createWebhook()" id="createBtn">
+                    🚀 Create Webhook
+                </button>
+            </div>
+            
+            <!-- Step 3: Webhook Created -->
+            <div class="step hidden" id="step3">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Webhook Created Successfully!</div>
+                </div>
+                
+                <div class="alert alert-success">
+                    <strong>🎉 Success!</strong> Your intelligent webhook has been created and is ready to use.
+                </div>
+                
+                <div class="webhook-url" id="webhookUrlSection">
+                    <h3>🔗 Your Webhook URL:</h3>
+                    <div>
+                        <code id="webhookUrl"></code>
+                        <button class="copy-btn" onclick="copyWebhookUrl()">📋 Copy</button>
+                    </div>
+                    <p style="margin-top: 15px; color: #6c757d;">
+                        Use this URL in your chatbot to connect to the AI brain with Cliniko booking capabilities.
+                    </p>
+                </div>
+                
+                <div class="clinic-info" id="clinicInfo">
+                    <h4>📋 Clinic Configuration</h4>
+                    <div id="clinicDetails"></div>
+                </div>
+                
+                <button class="btn" onclick="testWebhook()" id="testBtn" style="margin-top: 20px;">
+                    🧪 Test Webhook
+                </button>
+            </div>
+            
+            <!-- Test Results -->
+            <div class="step hidden" id="testResults">
+                <div class="step-header">
+                    <div class="step-number">✓</div>
+                    <div class="step-title">Test Results</div>
+                </div>
+                <div id="testOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        const WEBHOOK_BASE = 'http://localhost:3002';
+        
+        let detectedConfig = null;
+        let createdClinic = null;
+        
+        async function detectCliniko() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your Cliniko API key');
+                return;
+            }
+            
+            const detectBtn = document.getElementById('detectBtn');
+            detectBtn.innerHTML = '<span class="loading"></span>Detecting...';
+            detectBtn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/clinics/detect-cliniko`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayDetectionResults(result.data);
+                    document.getElementById('step1').classList.remove('active');
+                    document.getElementById('step1').classList.add('completed');
+                    document.getElementById('step2').classList.remove('hidden');
+                    document.getElementById('step2').classList.add('active');
+                } else {
+                    throw new Error(result.error?.message || 'Detection failed');
+                }
+                
+            } catch (error) {
+                document.getElementById('detectionResults').innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Detection Failed:</strong> ${error.message}
+                    </div>
+                `;
+                document.getElementById('step2').classList.remove('hidden');
+            }
+            
+            detectBtn.innerHTML = '🔍 Auto-Detect Clinic Settings';
+            detectBtn.disabled = false;
+        }
+        
+        function displayDetectionResults(data) {
+            detectedConfig = data;
+            
+            const resultsHtml = `
+                <div class="alert alert-success">
+                    <strong>✅ Detection Successful!</strong> Found ${data.businesses?.length || 0} business(es) and auto-detected your configuration.
+                </div>
+                
+                <div class="clinic-info">
+                    <h4>🔍 Auto-Detected Information</h4>
+                    <div class="info-row">
+                        <span class="info-label">Shard:</span>
+                        <span class="info-value">${data.shard}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Business ID:</span>
+                        <span class="info-value">${data.businessId}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Practitioners:</span>
+                        <span class="info-value">${data.practitionerCount}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Appointment Types:</span>
+                        <span class="info-value">${data.appointmentTypeCount}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Ready for Booking:</span>
+                        <span class="info-value">${data.readyForBooking ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('detectionResults').innerHTML = resultsHtml;
+        }
+        
+        async function createWebhook() {
+            const createBtn = document.getElementById('createBtn');
+            createBtn.innerHTML = '<span class="loading"></span>Creating...';
+            createBtn.disabled = true;
+            
+            const clinicData = {
+                name: document.getElementById('clinicName').value,
+                contactInfo: {
+                    email: document.getElementById('contactEmail').value,
+                    phone: document.getElementById('contactPhone').value,
+                    address: document.getElementById('contactAddress').value
+                },
+                businessHours: {
+                    monday: { open: "09:00", close: "17:00" },
+                    tuesday: { open: "09:00", close: "17:00" },
+                    wednesday: { open: "09:00", close: "17:00" },
+                    thursday: { open: "09:00", close: "17:00" },
+                    friday: { open: "09:00", close: "17:00" },
+                    saturday: { closed: true },
+                    sunday: { closed: true }
+                },
+                services: ["Physiotherapy", "Sports Massage", "Rehabilitation"],
+                bookingSystem: "cliniko",
+                apiCredentials: {
+                    apiKey: document.getElementById('apiKey').value,
+                    shard: detectedConfig.shard,
+                    businessId: detectedConfig.businessId
+                },
+                gdprSettings: {
+                    dataRetentionDays: 30,
+                    enableDataExport: true,
+                    enableDataDeletion: true
+                },
+                autoDetected: true
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/clinics`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(clinicData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    createdClinic = result.data;
+                    displayWebhookSuccess(result.data);
+                    document.getElementById('step2').classList.remove('active');
+                    document.getElementById('step2').classList.add('completed');
+                    document.getElementById('step3').classList.remove('hidden');
+                    document.getElementById('step3').classList.add('active');
+                } else {
+                    throw new Error(result.error?.message || 'Webhook creation failed');
+                }
+                
+            } catch (error) {
+                alert(`Error creating webhook: ${error.message}`);
+            }
+            
+            createBtn.innerHTML = '🚀 Create Webhook';
+            createBtn.disabled = false;
+        }
+        
+        function displayWebhookSuccess(clinicData) {
+            const webhookUrl = `${WEBHOOK_BASE}/webhook/${clinicData.webhookUrl}`;
+            document.getElementById('webhookUrl').textContent = webhookUrl;
+            
+            const clinicDetailsHtml = `
+                <div class="info-row">
+                    <span class="info-label">Clinic ID:</span>
+                    <span class="info-value">${clinicData.id}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">${clinicData.name}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Booking System:</span>
+                    <span class="info-value">${clinicData.bookingSystem}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Created:</span>
+                    <span class="info-value">${new Date(clinicData.createdAt).toLocaleString()}</span>
+                </div>
+            `;
+            
+            document.getElementById('clinicDetails').innerHTML = clinicDetailsHtml;
+        }
+        
+        function copyWebhookUrl() {
+            const webhookUrl = document.getElementById('webhookUrl').textContent;
+            navigator.clipboard.writeText(webhookUrl).then(() => {
+                alert('Webhook URL copied to clipboard!');
+            });
+        }
+        
+        async function testWebhook() {
+            if (!createdClinic) return;
+            
+            const testBtn = document.getElementById('testBtn');
+            testBtn.innerHTML = '<span class="loading"></span>Testing...';
+            testBtn.disabled = true;
+            
+            try {
+                let connectionResult = null;
+                let messageResult = null;
+                
+                // Test 1: Connection test (if webhook API is available)
+                try {
+                    const connectionResponse = await fetch(`${WEBHOOK_BASE}/test-connection/${createdClinic.webhookUrl}`, {
+                        method: 'POST'
+                    });
+                    connectionResult = await connectionResponse.json();
+                } catch (error) {
+                    connectionResult = { 
+                        success: false, 
+                        error: 'Webhook API offline - cannot test connection'
+                    };
+                }
+                
+                // Test 2: Sample message (if webhook API is available)
+                try {
+                    const messageResponse = await fetch(`${WEBHOOK_BASE}/webhook/${createdClinic.webhookUrl}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: "Hello! I'd like to book an appointment for physiotherapy.",
+                            sessionId: "test-session-" + Date.now(),
+                            userConsent: true
+                        })
+                    });
+                    messageResult = await messageResponse.json();
+                } catch (error) {
+                    messageResult = { 
+                        success: false, 
+                        error: 'Webhook API offline - cannot test AI response'
+                    };
+                }
+                
+                displayTestResults(connectionResult, messageResult);
+                
+            } catch (error) {
+                displayTestResults(null, null, error.message);
+            }
+            
+            testBtn.innerHTML = '🧪 Test Webhook';
+            testBtn.disabled = false;
+        }
+        
+        function displayTestResults(connectionResult, messageResult, error = null) {
+            let resultsHtml = '';
+            
+            if (error) {
+                resultsHtml = `
+                    <div class="alert alert-error">
+                        <strong>❌ Test Failed:</strong> ${error}
+                    </div>
+                `;
+            } else {
+                resultsHtml = `
+                    <div class="alert alert-success">
+                        <strong>✅ Connection Test:</strong> ${connectionResult.success ? 'Passed' : 'Failed'}
+                    </div>
+                    
+                    ${connectionResult.success ? `
+                    <div class="clinic-info">
+                        <h4>🔗 Connection Details</h4>
+                        <div class="info-row">
+                            <span class="info-label">Status:</span>
+                            <span class="info-value">${connectionResult.data.message}</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="alert ${messageResult.success ? 'alert-success' : 'alert-error'}">
+                        <strong>${messageResult.success ? '✅' : '❌'} Message Test:</strong> 
+                        ${messageResult.success ? 'AI responded successfully' : 'Failed to get AI response'}
+                    </div>
+                    
+                    ${messageResult.success ? `
+                    <div class="clinic-info">
+                        <h4>🤖 AI Response</h4>
+                        <p><strong>Message:</strong> ${messageResult.data.message}</p>
+                        <div class="info-row">
+                            <span class="info-label">Intent:</span>
+                            <span class="info-value">${messageResult.data.metadata.intent}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Confidence:</span>
+                            <span class="info-value">${(messageResult.data.metadata.confidence * 100).toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+            }
+            
+            document.getElementById('testOutput').innerHTML = resultsHtml;
+            document.getElementById('testResults').classList.remove('hidden');
+        }
+        
+        // Check if services are running on page load
+        window.addEventListener('load', async () => {
+            let dashboardHealthy = false;
+            let webhookHealthy = false;
+            
+            try {
+                const dashboardResponse = await fetch(`${API_BASE}/health`);
+                dashboardHealthy = dashboardResponse.ok;
+            } catch (error) {
+                console.log('Dashboard backend not available');
+            }
+            
+            try {
+                const webhookResponse = await fetch(`${WEBHOOK_BASE}/health`);
+                webhookHealthy = webhookResponse.ok;
+            } catch (error) {
+                console.log('Webhook API not available');
+            }
+            
+            if (!dashboardHealthy) {
+                alert(`⚠️ Dashboard Backend Required: The dashboard backend is not running on port 3001.\n\nPlease start it with: npm run dev:dashboard-backend`);
+                return;
+            }
+            
+            if (!webhookHealthy) {
+                // Show warning but allow continued use
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'alert alert-error';
+                warningDiv.style.margin = '20px';
+                warningDiv.innerHTML = `
+                    <strong>⚠️ Webhook API Offline:</strong> The webhook API (port 3002) is not running. 
+                    You can still create webhooks, but testing functionality will be limited.
+                    <br><br>
+                    <strong>To enable full testing:</strong> Start the webhook API with: <code>cd webhook-api && npm run dev</code>
+                `;
+                document.querySelector('.container').insertBefore(warningDiv, document.querySelector('.content'));
+            }
+        });
+    </script>
+</body>
+</html> 

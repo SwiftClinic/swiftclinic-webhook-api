@@ -1,0 +1,57 @@
+# PHYSIO CHAT SYSTEM - Environment Configuration Template
+# Copy this file to .env and fill in your values
+
+# =======================================================
+# SECURITY CONFIGURATION (CRITICAL - MUST BE CHANGED)
+# =======================================================
+MASTER_PASSWORD=your-very-secure-master-password-here-at-least-32-chars
+SESSION_SECRET=your-session-secret-at-least-64-chars-random
+
+# =======================================================
+# AI/LLM CONFIGURATION (REQUIRED FOR WEBHOOK API)
+# =======================================================
+OPENAI_API_KEY=your-openai-api-key-here
+
+# =======================================================
+# SERVER CONFIGURATION
+# =======================================================
+NODE_ENV=development
+PORT=3001
+WEBHOOK_PORT=3002
+LOG_LEVEL=info
+
+# =======================================================
+# DATABASE CONFIGURATION
+# =======================================================
+DATABASE_PATH=./data/dashboard.db
+
+# =======================================================
+# CORS CONFIGURATION (Dashboard Frontend URLs)
+# =======================================================
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+
+# =======================================================
+# SECURITY SETTINGS
+# =======================================================
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# =======================================================
+# GDPR COMPLIANCE
+# =======================================================
+DEFAULT_DATA_RETENTION_DAYS=30
+DPO_CONTACT=dpo@your-company.com
+
+# =======================================================
+# DEVELOPMENT SETTINGS (remove in production)
+# =======================================================
+ENABLE_DEBUG_LOGS=true
+DISABLE_RATE_LIMITING=false
+
+# =======================================================
+# PRODUCTION OVERRIDES (set these in production)
+# =======================================================
+# NODE_ENV=production
+# LOG_LEVEL=warn
+# ENABLE_DEBUG_LOGS=false
+# DISABLE_RATE_LIMITING=false 

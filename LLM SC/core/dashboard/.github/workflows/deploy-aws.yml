@@ -1,0 +1,92 @@
+name: Deploy Dashboard to AWS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: './backend/package-lock.json'
+        
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci
+      
+    - name: Build application
+      working-directory: ./backend
+      run: npm run build
+      
+    - name: Create deployment package
+      run: |
+        mkdir -p deploy-package
+        cp -r backend/dist deploy-package/
+        cp backend/package.json deploy-package/
+        cp .env.production deploy-package/.env
+        cp firebase-service-account.json deploy-package/
+        echo "✅ Deployment package created"
+        ls -la deploy-package/
+        
+    - name: Upload deployment files
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_SSH_KEY }}
+        source: "deploy-package/*"
+        target: "/tmp/"
+        
+    - name: Deploy to AWS Server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_SSH_KEY }}
+        script: |
+          echo "🚀 Starting deployment..."
+          
+          # Create backup
+          sudo cp -r /var/www/admin /var/www/admin.backup.$(date +%Y%m%d_%H%M%S) || echo "No existing deployment to backup"
+          
+          # Deploy new files
+          sudo mkdir -p /var/www/admin
+          sudo cp -r /tmp/deploy-package/* /var/www/admin/
+          
+          # Set correct permissions
+          sudo chown -R www-data:www-data /var/www/admin
+          sudo chmod -R 755 /var/www/admin
+          
+          # Install production dependencies (if needed)
+          cd /var/www/admin
+          sudo npm install --production --no-optional || echo "npm install skipped"
+          
+          # Restart the service
+          sudo systemctl daemon-reload
+          sudo systemctl restart swiftclinic-admin-backend
+          
+          # Check service status
+          echo "📊 Service status:"
+          sudo systemctl status swiftclinic-admin-backend --no-pager
+          
+          # Cleanup temp files
+          rm -rf /tmp/deploy-package
+          
+          echo "✅ Deployment complete!"
+          
+    - name: Verify deployment
+      run: |
+        echo "🧪 Testing deployment..."
+        sleep 10
+        curl -f https://admin.swiftclinic.ai/api/health || echo "⚠️ Health check failed"
+        echo "🎉 Deployment pipeline complete!"

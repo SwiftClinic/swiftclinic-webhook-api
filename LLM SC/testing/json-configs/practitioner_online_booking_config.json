@@ -1,0 +1,47 @@
+{
+  "active": true,
+  "created_at": "2025-07-29T13:15:26Z",
+  "description": "",
+  "designation": "",
+  "display_name": "Henry",
+  "first_name": "Henry",
+  "id": "1740586886222586607",
+  "label": "Henry Juliano",
+  "last_name": "Juliano",
+  "show_in_online_bookings": true,
+  "title": null,
+  "updated_at": "2025-07-29T19:13:12Z",
+  "default_appointment_type": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/appointment_types/1740586889158598690"
+    }
+  },
+  "user": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/users/1740586886046425899"
+    }
+  },
+  "appointments": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607/appointments"
+    }
+  },
+  "appointment_types": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607/appointment_types"
+    }
+  },
+  "invoices": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607/invoices"
+    }
+  },
+  "practitioner_reference_numbers": {
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607/practitioner_reference_numbers"
+    }
+  },
+  "links": {
+    "self": "https://api.uk2.cliniko.com/v1/practitioners/1740586886222586607"
+  }
+}

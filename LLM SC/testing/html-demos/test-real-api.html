@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔗 Test Real Cliniko API</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8f9fa;
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600;
+            color: #333;
+        }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #e1e5e9;
+            border-radius: 6px; 
+            font-size: 16px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #007cba;
+        }
+        .button { 
+            padding: 12px 24px; 
+            margin: 8px 8px 8px 0; 
+            border: none;
+            border-radius: 6px;
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .success { 
+            color: #155724; 
+            background: #d4edda; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #c3e6cb;
+            margin: 15px 0;
+        }
+        .error { 
+            color: #721c24; 
+            background: #f8d7da; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #f5c6cb;
+            margin: 15px 0;
+        }
+        .loading { 
+            color: #004085; 
+            background: #cce7ff; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #b8daff;
+            margin: 15px 0;
+        }
+        .info { 
+            color: #0c5460; 
+            background: #d1ecf1; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #bee5eb;
+            margin: 15px 0;
+        }
+        .business-card {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .step.active {
+            border-color: #007cba;
+            background: #f0f8ff;
+        }
+        .step.completed {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        .step.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .emoji { font-size: 1.2em; margin-right: 8px; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+        }
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Real Cliniko API Test</h1>
+        <p><strong>Test your actual Cliniko API key with the auto-detection system!</strong></p>
+
+        <div class="info">
+            <h4>📋 Instructions:</h4>
+            <ol>
+                <li>Enter your real Cliniko API key below</li>
+                <li>Click "Auto-Detect" to test all shards and find your business</li>
+                <li>Select your business and test the connection</li>
+                <li>Create a real clinic configuration</li>
+            </ol>
+        </div>
+
+        <!-- Step 1: API Key Input -->
+        <div class="step active" id="step1">
+            <h3><span class="emoji">🔑</span>Step 1: Enter Your Real Cliniko API Key</h3>
+            <div class="form-group">
+                <label for="apiKey">Cliniko API Key:</label>
+                <input type="password" id="apiKey" placeholder="Enter your real Cliniko API key..." />
+                <small style="color: #666;">Your API key will be sent securely to test the connection</small>
+            </div>
+            <button class="button btn-primary" onclick="realAutoDetect()">
+                🔍 Auto-Detect Configuration (Real API)
+            </button>
+            <button class="button btn-warning" onclick="toggleApiKeyVisibility()">
+                👁️ Show/Hide API Key
+            </button>
+            <div id="step1Results"></div>
+        </div>
+
+        <!-- Step 2: Business Selection -->
+        <div class="step" id="step2" style="display: none;">
+            <h3><span class="emoji">🏢</span>Step 2: Select Your Business</h3>
+            <div id="businessInfo"></div>
+            <div class="form-group">
+                <label for="businessSelect">Choose your business:</label>
+                <select id="businessSelect">
+                    <option value="">Select a business...</option>
+                </select>
+            </div>
+            <button class="button btn-success" onclick="realTestConnection()">
+                ✅ Test Connection (Real API)
+            </button>
+            <div id="step2Results"></div>
+        </div>
+
+        <!-- Step 3: Connection Results -->
+        <div class="step" id="step3" style="display: none;">
+            <h3><span class="emoji">🚀</span>Step 3: Ready to Create Clinic!</h3>
+            <div id="connectionResults"></div>
+        </div>
+
+        <!-- Step 4: Create Clinic Form -->
+        <div class="step" id="step4" style="display: none;">
+            <h3><span class="emoji">🏥</span>Step 4: Create Your Clinic</h3>
+            <p>All technical fields have been auto-detected. Just fill in your clinic details:</p>
+            
+            <div class="two-column">
+                <div>
+                    <div class="form-group">
+                        <label for="clinicName">Clinic Name:</label>
+                        <input type="text" id="clinicName" placeholder="Downtown Physiotherapy" />
+                    </div>
+                    <div class="form-group">
+                        <label for="clinicEmail">Contact Email:</label>
+                        <input type="email" id="clinicEmail" placeholder="admin@clinic.com" />
+                    </div>
+                    <div class="form-group">
+                        <label for="clinicPhone">Contact Phone:</label>
+                        <input type="tel" id="clinicPhone" placeholder="+44 20 1234 5678" />
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="clinicAddress">Address:</label>
+                        <textarea id="clinicAddress" rows="3" placeholder="123 Main Street, London, UK"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="services">Services (one per line):</label>
+                        <textarea id="services" rows="4" placeholder="General Physiotherapy&#10;Sports Injury Rehabilitation&#10;Manual Therapy"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <button class="button btn-danger" onclick="createRealClinic()">
+                🚀 Create Clinic with Auto-Detected Settings
+            </button>
+            <div id="step4Results"></div>
+        </div>
+
+        <!-- Debug Info -->
+        <div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
+            <h4>🔧 Debug Information</h4>
+            <button class="button btn-warning" onclick="showDebugInfo()">Show API Responses</button>
+            <div id="debugInfo" style="display: none;">
+                <h5>Detection Response:</h5>
+                <pre id="detectionResponse">No data yet</pre>
+                <h5>Connection Test Response:</h5>
+                <pre id="connectionResponse">No data yet</pre>
+                <h5>Clinic Creation Response:</h5>
+                <pre id="creationResponse">No data yet</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let detectedConfig = null;
+        let selectedBusinessId = null;
+        let debugData = {
+            detection: null,
+            connection: null,
+            creation: null
+        };
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('apiKey');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        async function realAutoDetect() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                showResult('step1Results', 'error', '❌ Please enter your Cliniko API key');
+                return;
+            }
+
+            if (apiKey.length < 10) {
+                showResult('step1Results', 'error', '❌ API key seems too short. Please check your key.');
+                return;
+            }
+
+            showResult('step1Results', 'loading', '🔍 Auto-detecting Cliniko configuration...<br><br>⏳ Testing shards: uk2, au1, us1, ca1...<br>📡 This may take 10-30 seconds...');
+
+            try {
+                const response = await fetch('http://localhost:3001/api/clinics/detect-cliniko', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+
+                const data = await response.json();
+                debugData.detection = data;
+
+                if (data.success) {
+                    detectedConfig = data.data;
+                    
+                    let resultHTML = `
+                        <div class="success">
+                            <h4>✅ Auto-Detection Successful!</h4>
+                            <p><strong>🌍 Shard:</strong> ${data.data.shard}</p>
+                            <p><strong>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Country:</strong> ${data.data.recommendations.country}</p>
+                            <p><strong>🕒 Timezone:</strong> ${data.data.recommendations.timezone}</p>
+                            <p><strong>🏢 Businesses Found:</strong> ${data.data.businesses.length}</p>
+                        </div>
+                    `;
+
+                    showResult('step1Results', 'success', resultHTML);
+                    
+                    // Setup business selection
+                    const businessSelect = document.getElementById('businessSelect');
+                    businessSelect.innerHTML = '<option value="">Select a business...</option>';
+                    
+                    let businessInfoHTML = '<h4>Available Businesses:</h4>';
+                    data.data.businesses.forEach((business, index) => {
+                        const option = document.createElement('option');
+                        option.value = business.id;
+                        option.textContent = `${business.name} (${business.country})`;
+                        businessSelect.appendChild(option);
+
+                        businessInfoHTML += `
+                            <div class="business-card">
+                                <strong>${business.name}</strong><br>
+                                📍 Country: ${business.country}<br>
+                                🕒 Timezone: ${business.timezone}<br>
+                                🆔 ID: ${business.id}
+                            </div>
+                        `;
+                    });
+                    
+                    document.getElementById('businessInfo').innerHTML = businessInfoHTML;
+                    
+                    // Progress to step 2
+                    completeStep('step1');
+                    showStep('step2');
+                    
+                } else {
+                    showResult('step1Results', 'error', `❌ Detection failed: ${data.error.message}`);
+                    setStepError('step1');
+                }
+
+            } catch (error) {
+                showResult('step1Results', 'error', `❌ Connection Error: ${error.message}<br><br>Make sure the dashboard backend is running on port 3001.`);
+                setStepError('step1');
+            }
+        }
+
+        async function realTestConnection() {
+            if (!detectedConfig) {
+                showResult('step2Results', 'error', '❌ Please run auto-detection first');
+                return;
+            }
+
+            selectedBusinessId = document.getElementById('businessSelect').value;
+            
+            if (!selectedBusinessId) {
+                showResult('step2Results', 'error', '❌ Please select a business');
+                return;
+            }
+
+            showResult('step2Results', 'loading', '🔄 Testing connection to Cliniko...<br><br>⏳ Checking practitioners and appointment types...');
+
+            try {
+                const response = await fetch('http://localhost:3001/api/clinics/test-cliniko', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        apiKey: document.getElementById('apiKey').value,
+                        shard: detectedConfig.shard,
+                        businessId: selectedBusinessId
+                    })
+                });
+
+                const data = await response.json();
+                debugData.connection = data;
+
+                if (data.success) {
+                    let resultHTML = `
+                        <div class="success">
+                            <h4>✅ Connection Test Successful!</h4>
+                            <p><strong>👥 Practitioners:</strong> ${data.data.practitionerCount}</p>
+                            <p><strong>📅 Appointment Types:</strong> ${data.data.appointmentTypeCount}</p>
+                            <p><strong>🚀 Ready for Booking:</strong> ${data.data.readyForBooking ? 'Yes ✅' : 'No ❌'}</p>
+                        </div>
+                    `;
+
+                    showResult('step2Results', 'success', resultHTML);
+
+                    if (data.data.readyForBooking) {
+                        // Progress to step 3
+                        completeStep('step2');
+                        showStep('step3');
+                        
+                        const selectedBusiness = detectedConfig.businesses.find(b => b.id === selectedBusinessId);
+                        showResult('connectionResults', 'success', `
+                            <div class="success">
+                                <h4>🎉 Perfect! Your Cliniko is Ready!</h4>
+                                <p>All configuration has been automatically detected:</p>
+                                <div class="business-card">
+                                    <strong>🔧 Auto-Detected Configuration:</strong><br>
+                                    📍 Shard: ${detectedConfig.shard}<br>
+                                    🏢 Business: ${selectedBusiness.name}<br>
+                                    🆔 Business ID: ${selectedBusinessId}<br>
+                                    🌍 Country: ${selectedBusiness.country}<br>
+                                    🕒 Timezone: ${selectedBusiness.timezone}<br>
+                                    👥 Practitioners: ${data.data.practitionerCount}<br>
+                                    📅 Appointment Types: ${data.data.appointmentTypeCount}
+                                </div>
+                                <p><strong>✅ Your Cliniko account is ready for booking automation!</strong></p>
+                            </div>
+                        `);
+
+                        // Show clinic creation form
+                        showStep('step4');
+                        
+                        // Pre-fill some fields based on business info
+                        document.getElementById('clinicName').value = selectedBusiness.name;
+                    } else {
+                        showResult('connectionResults', 'error', `
+                            <div class="error">
+                                <h4>⚠️ Setup Required</h4>
+                                <p>Your Cliniko connection works, but you need to set up:</p>
+                                <ul>
+                                    ${data.data.practitionerCount === 0 ? '<li>Add practitioners to your Cliniko account</li>' : ''}
+                                    ${data.data.appointmentTypeCount === 0 ? '<li>Create appointment types in your Cliniko account</li>' : ''}
+                                </ul>
+                                <p>Please configure these in Cliniko, then test again.</p>
+                            </div>
+                        `);
+                    }
+                } else {
+                    showResult('step2Results', 'error', `❌ Connection test failed: ${data.error.message}`);
+                    setStepError('step2');
+                }
+
+            } catch (error) {
+                showResult('step2Results', 'error', `❌ Connection Error: ${error.message}`);
+                setStepError('step2');
+            }
+        }
+
+        async function createRealClinic() {
+            const clinicName = document.getElementById('clinicName').value.trim();
+            const clinicEmail = document.getElementById('clinicEmail').value.trim();
+            const clinicPhone = document.getElementById('clinicPhone').value.trim();
+            const clinicAddress = document.getElementById('clinicAddress').value.trim();
+            const servicesText = document.getElementById('services').value.trim();
+
+            if (!clinicName || !clinicEmail || !clinicPhone || !clinicAddress || !servicesText) {
+                showResult('step4Results', 'error', '❌ Please fill in all clinic details');
+                return;
+            }
+
+            const services = servicesText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+
+            showResult('step4Results', 'loading', '🚀 Creating your clinic...<br><br>⏳ Setting up with auto-detected Cliniko configuration...');
+
+            try {
+                const clinicData = {
+                    name: clinicName,
+                    contactInfo: {
+                        email: clinicEmail,
+                        phone: clinicPhone,
+                        address: clinicAddress
+                    },
+                    businessHours: {
+                        monday: { open: "08:00", close: "18:00" },
+                        tuesday: { open: "08:00", close: "18:00" },
+                        wednesday: { open: "08:00", close: "18:00" },
+                        thursday: { open: "08:00", close: "18:00" },
+                        friday: { open: "08:00", close: "17:00" },
+                        saturday: null,
+                        sunday: null
+                    },
+                    services: services,
+                    bookingSystem: "cliniko",
+                    apiCredentials: {
+                        apiKey: document.getElementById('apiKey').value,
+                        shard: detectedConfig.shard,
+                        businessId: selectedBusinessId
+                    },
+                    gdprSettings: {
+                        dataRetentionDays: 30,
+                        allowDataProcessing: true,
+                        cookieConsent: true
+                    },
+                    autoDetected: true
+                };
+
+                const response = await fetch('http://localhost:3001/api/clinics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(clinicData)
+                });
+
+                const data = await response.json();
+                debugData.creation = data;
+
+                if (data.success) {
+                    showResult('step4Results', 'success', `
+                        <div class="success">
+                            <h4>🎉 Clinic Created Successfully!</h4>
+                            <div class="business-card">
+                                <strong>📋 Your New Clinic:</strong><br>
+                                🆔 Clinic ID: ${data.data.id}<br>
+                                🏥 Name: ${data.data.name}<br>
+                                🔗 Webhook URL: ${data.data.webhookUrl}<br>
+                                🤖 Booking System: ${data.data.bookingSystem}<br>
+                                ✅ Auto-Detected: ${data.data.autoDetected ? 'Yes' : 'No'}<br>
+                                📍 Shard: ${data.data.clinikoInfo?.shard}<br>
+                                🏢 Business ID: ${data.data.clinikoInfo?.businessId}
+                            </div>
+                            <p><strong>🚀 Your intelligent chat system is now ready!</strong></p>
+                            <p>Webhook endpoint: <code>http://localhost:3002/webhook/${data.data.webhookUrl}</code></p>
+                        </div>
+                    `);
+                    completeStep('step4');
+                } else {
+                    showResult('step4Results', 'error', `❌ Clinic creation failed: ${data.error.message}`);
+                    setStepError('step4');
+                }
+
+            } catch (error) {
+                showResult('step4Results', 'error', `❌ Creation Error: ${error.message}`);
+                setStepError('step4');
+            }
+        }
+
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+            
+            document.getElementById('detectionResponse').textContent = JSON.stringify(debugData.detection, null, 2);
+            document.getElementById('connectionResponse').textContent = JSON.stringify(debugData.connection, null, 2);
+            document.getElementById('creationResponse').textContent = JSON.stringify(debugData.creation, null, 2);
+        }
+
+        // Helper functions
+        function showResult(elementId, type, message) {
+            document.getElementById(elementId).innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function showStep(stepId) {
+            document.getElementById(stepId).style.display = 'block';
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        function completeStep(stepId) {
+            const step = document.getElementById(stepId);
+            step.classList.remove('active');
+            step.classList.add('completed');
+        }
+
+        function setStepError(stepId) {
+            const step = document.getElementById(stepId);
+            step.classList.remove('active');
+            step.classList.add('error');
+        }
+    </script>
+</body>
+</html> 

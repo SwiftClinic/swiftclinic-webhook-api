@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔗 Test Real Cliniko API</title>
+    <style>
+        body { font-family: system-ui; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .container { background: #f8f9fa; padding: 30px; border-radius: 12px; }
+        input, button { padding: 12px; margin: 10px; font-size: 16px; }
+        input { width: 70%; font-family: monospace; }
+        button { background: #007cba; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #005a8b; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 6px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { background: #cce7ff; color: #004085; border: 1px solid #b8daff; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Test Real Cliniko API</h1>
+        <p><strong>Enter your real Cliniko API key to test auto-detection:</strong></p>
+        
+        <input type="password" id="apiKey" placeholder="Enter your Cliniko API key..." />
+        <button onclick="testAutoDetect()">🔍 Auto-Detect</button>
+        <button onclick="toggleKey()">👁️ Show/Hide</button>
+        
+        <div id="result"></div>
+        
+        <h3>📋 What This Tests:</h3>
+        <ul>
+            <li>✅ Tests your API key against all Cliniko shards (uk2, au1, us1, ca1)</li>
+            <li>✅ Finds your businesses automatically</li>
+            <li>✅ Detects your timezone and country</li>
+            <li>✅ Returns business IDs for configuration</li>
+        </ul>
+    </div>
+
+    <script>
+        function toggleKey() {
+            const input = document.getElementById('apiKey');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        async function testAutoDetect() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                showResult('error', 'Please enter your Cliniko API key');
+                return;
+            }
+
+            showResult('loading', 'Auto-detecting Cliniko configuration...\n\nTesting shards: uk2, au1, us1, ca1...\nThis may take 10-30 seconds...');
+
+            try {
+                const response = await fetch('http://localhost:3001/api/clinics/detect-cliniko', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiKey })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let resultText = `✅ SUCCESS! Auto-Detection Complete!\n\n`;
+                    resultText += `🌍 Shard: ${data.data.shard}\n`;
+                    resultText += `🏴󠁧󠁢󠁥󠁮󠁧󠁿 Country: ${data.data.recommendations.country}\n`;
+                    resultText += `🕒 Timezone: ${data.data.recommendations.timezone}\n`;
+                    resultText += `🏢 Businesses Found: ${data.data.businesses.length}\n\n`;
+                    
+                    data.data.businesses.forEach((business, i) => {
+                        resultText += `Business ${i + 1}:\n`;
+                        resultText += `  📋 Name: ${business.name}\n`;
+                        resultText += `  🆔 ID: ${business.id}\n`;
+                        resultText += `  📍 Country: ${business.country}\n`;
+                        resultText += `  🕒 Timezone: ${business.timezone}\n\n`;
+                    });
+
+                    resultText += `🎉 Ready for clinic creation!`;
+                    showResult('success', resultText);
+                } else {
+                    showResult('error', `❌ Detection Failed: ${data.error.message}`);
+                }
+
+            } catch (error) {
+                showResult('error', `❌ Connection Error: ${error.message}\n\nMake sure the dashboard backend is running on port 3001.`);
+            }
+        }
+
+        function showResult(type, message) {
+            document.getElementById('result').innerHTML = `<div class="result ${type}"><pre>${message}</pre></div>`;
+        }
+    </script>
+</body>
+</html> 

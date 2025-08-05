@@ -1,0 +1,14 @@
+{
+  "endpoint": "https://api.uk2.cliniko.com/v1/businesses/1740586889502532285/practitioners/1740586886222586607/appointment_types/1740586888823054369/next_available_time",
+  "params": {
+    "business_id": "1740586889502532285",
+    "practitioner_id": "1740586886222586607",
+    "from": "2025-08-01"
+  },
+  "response": {
+    "appointment_start": "2025-07-30T08:00:00Z",
+    "links": {
+      "self": "https://api.uk2.cliniko.com/v1/businesses/1740586889502532285/practitioners/1740586886222586607/appointment_types/1740586888823054369/next_available_time"
+    }
+  }
+}

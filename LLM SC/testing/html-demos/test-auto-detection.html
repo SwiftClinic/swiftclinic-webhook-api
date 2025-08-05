@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Cliniko Auto-Detection Test</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8f9fa;
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600;
+            color: #333;
+        }
+        input, select { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #e1e5e9;
+            border-radius: 6px; 
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #007cba;
+        }
+        .button { 
+            padding: 12px 24px; 
+            margin: 8px 8px 8px 0; 
+            border: none;
+            border-radius: 6px;
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .success { 
+            color: #155724; 
+            background: #d4edda; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #c3e6cb;
+            margin: 15px 0;
+        }
+        .error { 
+            color: #721c24; 
+            background: #f8d7da; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #f5c6cb;
+            margin: 15px 0;
+        }
+        .loading { 
+            color: #004085; 
+            background: #cce7ff; 
+            padding: 15px; 
+            border-radius: 6px; 
+            border: 1px solid #b8daff;
+            margin: 15px 0;
+        }
+        .business-card {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        .hidden { display: none; }
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+        }
+        .step.active {
+            border-color: #007cba;
+            background: #f0f8ff;
+        }
+        .step.completed {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        .emoji { font-size: 1.2em; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Cliniko Auto-Detection Test</h1>
+        <p><strong>Test the ultra user-friendly clinic setup process!</strong> Just enter your Cliniko API key and watch the magic happen.</p>
+
+        <!-- Step 1: API Key Input -->
+        <div class="step active" id="step1">
+            <h3><span class="emoji">🔑</span>Step 1: Enter Your Cliniko API Key</h3>
+            <div class="form-group">
+                <label for="apiKey">Cliniko API Key:</label>
+                <input type="text" id="apiKey" placeholder="sk_cliniko_your_api_key_here..." />
+                <small style="color: #666;">Find this in your Cliniko settings under Integrations → API</small>
+            </div>
+            <button class="button btn-primary" onclick="autoDetect()">
+                🔍 Auto-Detect Configuration
+            </button>
+            <div id="step1Results"></div>
+        </div>
+
+        <!-- Step 2: Business Selection -->
+        <div class="step hidden" id="step2">
+            <h3><span class="emoji">🏢</span>Step 2: Select Your Business</h3>
+            <div id="businessSelection">
+                <div class="form-group">
+                    <label for="businessSelect">Choose your business:</label>
+                    <select id="businessSelect">
+                        <option value="">Select a business...</option>
+                    </select>
+                </div>
+                <button class="button btn-success" onclick="testConnection()">
+                    ✅ Test Connection
+                </button>
+            </div>
+            <div id="step2Results"></div>
+        </div>
+
+        <!-- Step 3: Connection Results -->
+        <div class="step hidden" id="step3">
+            <h3><span class="emoji">🚀</span>Step 3: Ready to Create Clinic!</h3>
+            <div id="connectionResults"></div>
+        </div>
+
+        <!-- Demo Info -->
+        <div style="margin-top: 40px; padding: 20px; background: #fff3cd; border-radius: 6px; border: 1px solid #ffeaa7;">
+            <h4>📋 Demo Information</h4>
+            <p><strong>Note:</strong> This is a demo of the auto-detection functionality. In a real implementation:</p>
+            <ul>
+                <li>✅ The system tests your API key against all Cliniko shards (uk2, au1, us1, ca1)</li>
+                <li>✅ Automatically detects your shard and available businesses</li>
+                <li>✅ Validates connection and checks practitioner/appointment type setup</li>
+                <li>✅ Pre-fills all clinic creation fields for you</li>
+            </ul>
+            <p><strong>API Endpoints:</strong></p>
+            <ul>
+                <li><code>POST /api/clinics/detect-cliniko</code> - Auto-detect shard and businesses</li>
+                <li><code>POST /api/clinics/test-cliniko</code> - Test connection and readiness</li>
+                <li><code>POST /api/clinics</code> - Create clinic with auto-detected values</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let detectedConfig = null;
+
+        async function autoDetect() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                showResult('step1Results', 'error', '❌ Please enter your Cliniko API key');
+                return;
+            }
+
+            showResult('step1Results', 'loading', '🔍 Auto-detecting Cliniko configuration...\n\n⏳ Testing shards: uk2, au1, us1, ca1...');
+
+            // Simulate API call (replace with actual call in real implementation)
+            try {
+                // Demo response - in real implementation this would be:
+                // const response = await fetch('/api/clinics/detect-cliniko', { ... })
+                
+                await simulateDelay(2000); // Simulate API call delay
+                
+                // Mock successful detection response
+                const mockResponse = {
+                    success: true,
+                    data: {
+                        shard: 'uk2',
+                        businesses: [
+                            {
+                                id: '12345',
+                                name: 'Downtown Physiotherapy',
+                                country: 'United Kingdom',
+                                timezone: 'Europe/London'
+                            },
+                            {
+                                id: '67890',
+                                name: 'Sports Rehab Center',
+                                country: 'United Kingdom', 
+                                timezone: 'Europe/London'
+                            }
+                        ],
+                        autoDetected: true,
+                        recommendations: {
+                            preferredBusinessId: '12345',
+                            timezone: 'Europe/London',
+                            country: 'United Kingdom'
+                        }
+                    }
+                };
+
+                if (mockResponse.success) {
+                    detectedConfig = mockResponse.data;
+                    
+                    let resultHTML = `
+                        <div class="success">
+                            <h4>✅ Auto-Detection Successful!</h4>
+                            <p><strong>🌍 Shard:</strong> ${mockResponse.data.shard}</p>
+                            <p><strong>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Country:</strong> ${mockResponse.data.recommendations.country}</p>
+                            <p><strong>🕒 Timezone:</strong> ${mockResponse.data.recommendations.timezone}</p>
+                            <p><strong>🏢 Businesses Found:</strong> ${mockResponse.data.businesses.length}</p>
+                        </div>
+                    `;
+
+                    showResult('step1Results', 'success', resultHTML);
+                    
+                    // Setup business selection
+                    const businessSelect = document.getElementById('businessSelect');
+                    businessSelect.innerHTML = '<option value="">Select a business...</option>';
+                    
+                    mockResponse.data.businesses.forEach(business => {
+                        const option = document.createElement('option');
+                        option.value = business.id;
+                        option.textContent = `${business.name} (${business.country})`;
+                        businessSelect.appendChild(option);
+                    });
+                    
+                    // Progress to step 2
+                    completeStep('step1');
+                    showStep('step2');
+                    
+                } else {
+                    showResult('step1Results', 'error', `❌ Detection failed: Invalid API key or no accessible Cliniko account found`);
+                }
+
+            } catch (error) {
+                showResult('step1Results', 'error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function testConnection() {
+            if (!detectedConfig) {
+                showResult('step2Results', 'error', '❌ Please run auto-detection first');
+                return;
+            }
+
+            const selectedBusinessId = document.getElementById('businessSelect').value;
+            
+            if (!selectedBusinessId) {
+                showResult('step2Results', 'error', '❌ Please select a business');
+                return;
+            }
+
+            showResult('step2Results', 'loading', '🔄 Testing connection to Cliniko...\n\n⏳ Checking practitioners and appointment types...');
+
+            try {
+                await simulateDelay(1500); // Simulate API call delay
+                
+                // Mock connection test response
+                const mockTestResponse = {
+                    success: true,
+                    data: {
+                        connectionValid: true,
+                        businessExists: true,
+                        practitionerCount: 3,
+                        appointmentTypeCount: 5,
+                        readyForBooking: true
+                    }
+                };
+
+                if (mockTestResponse.success) {
+                    let resultHTML = `
+                        <div class="success">
+                            <h4>✅ Connection Test Successful!</h4>
+                            <p><strong>👥 Practitioners:</strong> ${mockTestResponse.data.practitionerCount}</p>
+                            <p><strong>📅 Appointment Types:</strong> ${mockTestResponse.data.appointmentTypeCount}</p>
+                            <p><strong>🚀 Ready for Booking:</strong> ${mockTestResponse.data.readyForBooking ? 'Yes ✅' : 'No ❌'}</p>
+                        </div>
+                    `;
+
+                    showResult('step2Results', 'success', resultHTML);
+
+                    if (mockTestResponse.data.readyForBooking) {
+                        // Progress to step 3
+                        completeStep('step2');
+                        showStep('step3');
+                        
+                        showResult('connectionResults', 'success', `
+                            <div class="success">
+                                <h4>🎉 Perfect! Your Cliniko is Ready!</h4>
+                                <p>All configuration has been automatically detected:</p>
+                                <div class="business-card">
+                                    <strong>🔧 Auto-Detected Configuration:</strong><br>
+                                    📍 Shard: ${detectedConfig.shard}<br>
+                                    🏢 Business ID: ${selectedBusinessId}<br>
+                                    🌍 Country: ${detectedConfig.recommendations.country}<br>
+                                    🕒 Timezone: ${detectedConfig.recommendations.timezone}<br>
+                                    👥 Practitioners: ${mockTestResponse.data.practitionerCount}<br>
+                                    📅 Appointment Types: ${mockTestResponse.data.appointmentTypeCount}
+                                </div>
+                                <p><strong>Next Steps:</strong></p>
+                                <ol>
+                                    <li>✅ API key validated</li>
+                                    <li>✅ Shard auto-detected</li>
+                                    <li>✅ Business selected</li>
+                                    <li>✅ Connection tested</li>
+                                    <li>🚀 Ready to create clinic!</li>
+                                </ol>
+                                <button class="button btn-danger" onclick="simulateClinicCreation('${selectedBusinessId}')">
+                                    🚀 Create Clinic with Auto-Detected Values
+                                </button>
+                            </div>
+                        `);
+                    }
+                } else {
+                    showResult('step2Results', 'error', `❌ Connection test failed: Connection test failed`);
+                }
+
+            } catch (error) {
+                showResult('step2Results', 'error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        function simulateClinicCreation(businessId) {
+            const selectedBusiness = detectedConfig.businesses.find(b => b.id === businessId);
+            
+            alert(`🎉 Clinic Creation Simulation
+            
+✅ All values auto-detected successfully!
+
+📋 Configuration Summary:
+• API Key: ${document.getElementById('apiKey').value.substring(0, 20)}...
+• Shard: ${detectedConfig.shard}
+• Business: ${selectedBusiness.name}
+• Business ID: ${businessId}
+• Country: ${selectedBusiness.country}
+• Timezone: ${selectedBusiness.timezone}
+
+🚀 In the real system, this would now:
+1. Create the clinic with all auto-detected values
+2. Generate a unique webhook URL
+3. Set up the LLM brain with Cliniko integration
+4. Return the webhook URL for embedding
+
+💡 User Experience: 
+Instead of filling out 7+ technical fields, the user only entered their API key!`);
+        }
+
+        // Helper functions
+        function showResult(elementId, type, message) {
+            document.getElementById(elementId).innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function showStep(stepId) {
+            document.getElementById(stepId).classList.remove('hidden');
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        function completeStep(stepId) {
+            const step = document.getElementById(stepId);
+            step.classList.remove('active');
+            step.classList.add('completed');
+        }
+
+        function simulateDelay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+</body>
+</html> 

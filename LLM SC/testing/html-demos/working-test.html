@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔗 Working Cliniko API Test</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px; 
+            background: #f8f9fa;
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600;
+            color: #333;
+        }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #e1e5e9;
+            border-radius: 6px; 
+            font-size: 16px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007cba;
+        }
+        .button { 
+            padding: 12px 24px; 
+            margin: 8px 8px 8px 0; 
+            border: none;
+            border-radius: 6px;
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .result-box { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border-radius: 6px; 
+            min-height: 50px;
+        }
+        .success { 
+            color: #155724; 
+            background: #d4edda; 
+            border: 1px solid #c3e6cb;
+        }
+        .error { 
+            color: #721c24; 
+            background: #f8d7da; 
+            border: 1px solid #f5c6cb;
+        }
+        .loading { 
+            color: #004085; 
+            background: #cce7ff; 
+            border: 1px solid #b8daff;
+        }
+        .info { 
+            color: #0c5460; 
+            background: #d1ecf1; 
+            border: 1px solid #bee5eb;
+        }
+        pre { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 6px; 
+            overflow-x: auto; 
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .status { 
+            margin: 10px 0; 
+            padding: 10px; 
+            background: #e9ecef; 
+            border-radius: 4px; 
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Working Cliniko API Test</h1>
+        <p><strong>Test your real Cliniko API key with auto-detection!</strong></p>
+
+        <div class="info result-box">
+            <h4>📋 Instructions:</h4>
+            <ol>
+                <li>Enter your real Cliniko API key below</li>
+                <li>Click "Show/Hide" to test JavaScript is working</li>
+                <li>Click "Auto-Detect" to test your API key</li>
+            </ol>
+        </div>
+
+        <div class="form-group">
+            <label for="apiKey">Cliniko API Key:</label>
+            <input type="password" id="apiKey" placeholder="Enter your real Cliniko API key..." />
+            <small style="color: #666;">Your API key will be sent securely to test the connection</small>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button class="button btn-primary" onclick="testAutoDetect()">
+                🔍 Auto-Detect Configuration
+            </button>
+            <button class="button btn-warning" onclick="toggleApiKeyVisibility()">
+                👁️ Show/Hide API Key
+            </button>
+            <button class="button btn-warning" onclick="testJavaScript()">
+                🧪 Test JavaScript
+            </button>
+        </div>
+
+        <div class="status" id="status">
+            Ready to test...
+        </div>
+
+        <div id="result"></div>
+
+        <div style="margin-top: 30px;">
+            <h3>🔧 Troubleshooting:</h3>
+            <ul>
+                <li><strong>Dashboard Backend:</strong> <span id="backendStatus">Checking...</span></li>
+                <li><strong>JavaScript:</strong> <span id="jsStatus">✅ Working</span></li>
+                <li><strong>CORS:</strong> <span id="corsStatus">Will test with API call</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Test JavaScript immediately on load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 JavaScript loaded successfully!');
+            document.getElementById('jsStatus').innerHTML = '✅ Working';
+            updateStatus('JavaScript loaded successfully!');
+            
+            // Test backend connection
+            checkBackendStatus();
+        });
+
+        function updateStatus(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            document.getElementById('status').innerHTML = `[${timestamp}] ${message}`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function testJavaScript() {
+            updateStatus('JavaScript test clicked - everything is working!');
+            showResult('success', '✅ JavaScript is working perfectly!\n\nAll functions are loaded and responding correctly.');
+        }
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('apiKey');
+            const wasPassword = input.type === 'password';
+            input.type = wasPassword ? 'text' : 'password';
+            updateStatus(`API key ${wasPassword ? 'shown' : 'hidden'}`);
+        }
+
+        async function checkBackendStatus() {
+            try {
+                updateStatus('Checking backend connection...');
+                const response = await fetch('http://localhost:3001/health');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('backendStatus').innerHTML = '✅ Running on port 3001';
+                    updateStatus('Backend is running and healthy!');
+                } else {
+                    document.getElementById('backendStatus').innerHTML = '❌ Unhealthy response';
+                    updateStatus('Backend responded but reported unhealthy status');
+                }
+            } catch (error) {
+                document.getElementById('backendStatus').innerHTML = '❌ Not running';
+                updateStatus(`Backend connection failed: ${error.message}`);
+                showResult('error', `❌ Backend Connection Failed\n\nError: ${error.message}\n\nMake sure the dashboard backend is running:\n1. Open terminal\n2. cd dashboard/backend\n3. npm run dev`);
+            }
+        }
+
+        async function testAutoDetect() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                updateStatus('No API key entered');
+                showResult('error', '❌ Please enter your Cliniko API key');
+                return;
+            }
+
+            if (apiKey.length < 10) {
+                updateStatus('API key too short');
+                showResult('error', '❌ API key seems too short. Please check your key.');
+                return;
+            }
+
+            updateStatus('Starting auto-detection...');
+            showResult('loading', '🔍 Auto-detecting Cliniko configuration...\n\n⏳ Testing shards: uk2, au1, us1, ca1...\n📡 This may take 10-30 seconds...\n\nPlease wait...');
+
+            try {
+                const response = await fetch('http://localhost:3001/api/clinics/detect-cliniko', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+
+                updateStatus(`Received response: ${response.status}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('corsStatus').innerHTML = '✅ Working';
+                    updateStatus('Auto-detection successful!');
+                    
+                    let resultText = `✅ SUCCESS! Auto-Detection Complete!\n\n`;
+                    resultText += `🌍 Shard: ${data.data.shard}\n`;
+                    resultText += `🏴󠁧󠁢󠁥󠁮󠁧󠁿 Country: ${data.data.recommendations.country}\n`;
+                    resultText += `🕒 Timezone: ${data.data.recommendations.timezone}\n`;
+                    resultText += `🏢 Businesses Found: ${data.data.businesses.length}\n\n`;
+                    
+                    data.data.businesses.forEach((business, i) => {
+                        resultText += `Business ${i + 1}:\n`;
+                        resultText += `  📋 Name: ${business.name}\n`;
+                        resultText += `  🆔 ID: ${business.id}\n`;
+                        resultText += `  📍 Country: ${business.country}\n`;
+                        resultText += `  🕒 Timezone: ${business.timezone}\n\n`;
+                    });
+
+                    resultText += `🎉 Ready for clinic creation!\n\n`;
+                    resultText += `Next step: Create the dashboard frontend UI!`;
+                    showResult('success', resultText);
+                } else {
+                    document.getElementById('corsStatus').innerHTML = '✅ Working (but API failed)';
+                    updateStatus(`Auto-detection failed: ${data.error.message}`);
+                    showResult('error', `❌ Detection Failed: ${data.error.message}\n\nThis usually means:\n1. Invalid API key\n2. API key doesn't have proper permissions\n3. Cliniko account not accessible\n\nPlease check your API key in Cliniko settings.`);
+                }
+
+            } catch (error) {
+                updateStatus(`Connection error: ${error.message}`);
+                document.getElementById('corsStatus').innerHTML = '❌ CORS or connection error';
+                showResult('error', `❌ Connection Error: ${error.message}\n\nPossible issues:\n1. Dashboard backend not running on port 3001\n2. CORS blocking the request\n3. Network connectivity issue\n\nTry:\n1. Make sure backend is running: npm run dev (in dashboard/backend)\n2. Check if you can access: http://localhost:3001/health`);
+            }
+        }
+
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result-box ${type}"><pre>${message}</pre></div>`;
+        }
+
+        // Log any JavaScript errors
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript Error:', e.error);
+            updateStatus(`JavaScript Error: ${e.message}`);
+        });
+
+        // Test fetch availability
+        if (typeof fetch === 'undefined') {
+            updateStatus('Fetch API not available - browser too old?');
+            showResult('error', '❌ Your browser does not support the fetch API. Please use a modern browser.');
+        }
+    </script>
+</body>
+</html> 

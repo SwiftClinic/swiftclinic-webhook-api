@@ -1,0 +1,191 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+lerna-debug.log*
+
+# Production builds
+/dist
+/build
+
+# Environment variables and sensitive data
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.backup*
+temp_api_key.txt
+**/temp_api_key.txt
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Firebase credentials
+firebase-service-account.json
+**/firebase-service-account.json
+
+# Logs
+logs/
+logs
+*.log
+server.log
+webhook.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+<<<<<<< HEAD
+# Build outputs
+dist/
+dist-ssr/
+build/
+out/
+.next/
+
+# Cache directories
+.npm
+.eslintcache
+.parcel-cache
+.cache/
+.tmp/
+
+# Local environment files
+*.local
+
+# Database files (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE/Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+=======
+>>>>>>> d4d5baf6a505f850ecc1222785ee9094cb03f78a
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+<<<<<<< HEAD
+jspm_packages/
+=======
+node_modules/
+>>>>>>> d4d5baf6a505f850ecc1222785ee9094cb03f78a
+
+# Optional npm cache directory
+.npm
+
+<<<<<<< HEAD
+=======
+# Optional eslint cache
+.eslintcache
+
+>>>>>>> d4d5baf6a505f850ecc1222785ee9094cb03f78a
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+<<<<<<< HEAD
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
+
+# microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/ 
+=======
+# dotenv environment variables file
+.env
+.env.test
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vite build output
+dist/
+
+# rollup.js default build output
+dist/
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deployment packages
+webhook-updates.zip
+aws-deploy/
+deploy-package/
+
+# Backup files
+*.backup
+*.bakfirebase-service-account.json
+>>>>>>> d4d5baf6a505f850ecc1222785ee9094cb03f78a
