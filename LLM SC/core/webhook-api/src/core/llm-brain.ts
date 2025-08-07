@@ -6,6 +6,7 @@ import { BaseBookingAdapter } from '../booking-adapters/base-booking-adapter';
 import { ConversationManager } from './conversation-manager';
 import { EncryptionService } from '../../../shared/security/encryption';
 import { BookingAdapterFactory } from '../booking-adapters/adapter-factory';
+import { IntelligentContextManager, ConversationOffer, UserReference } from './intelligent-context-manager';
 
 export interface FunctionCall {
   name: string;
@@ -23,6 +24,8 @@ export interface LLMResponse {
     confidence: number;
     context?: any;
     knowledgeContextUsed?: boolean;
+    fallbackMode?: boolean;
+    bookingSystemStatus?: string;
   };
 }
 
@@ -38,6 +41,7 @@ export class LLMBrain {
   private openai: OpenAI;
   private conversationManager: ConversationManager;
   private database: SecureDatabase;
+  private intelligentContext: IntelligentContextManager;
 
   constructor(database: SecureDatabase) {
     this.openai = new OpenAI({
@@ -45,6 +49,12 @@ export class LLMBrain {
     });
     this.conversationManager = new ConversationManager(database);
     this.database = database;
+    this.intelligentContext = new IntelligentContextManager();
+
+    // Cleanup intelligent contexts every 30 minutes
+    setInterval(() => {
+      this.intelligentContext.cleanup();
+    }, 30 * 60 * 1000);
 
     console.log('✅ [LLMBrain] Initialized with simplified knowledge retrieval using official Pinecone pattern');
   }
@@ -66,6 +76,19 @@ export class LLMBrain {
       // Step 1: Pre-search knowledge base for context augmentation (following RAG pattern from image)
       const knowledgeContext = await this.searchKnowledgeForContext(request.message);
 
+      // Step 2: Intelligent context processing for conversation flow
+      const userReference = this.intelligentContext.resolveUserReference(request.sessionId, request.message);
+      const isReferencingOffer = this.intelligentContext.isReferencingPreviousOffer(request.sessionId, request.message);
+      const intendedDateTime = this.intelligentContext.getIntendedDateTime(request.sessionId);
+      
+      console.log('🧠 [IntelligentContext] User reference analysis:', {
+        isReferencingOffer,
+        timeRef: userReference.extracted.timeReference,
+        dateRef: userReference.extracted.dateReference,
+        resolvedTo: userReference.resolvedTo,
+        intendedDateTime
+      });
+
       // Store the current message
       await this.conversationManager.addMessage(request.sessionId, {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -86,7 +109,13 @@ export class LLMBrain {
         conversationHistory, 
         request.clinicConfig,
         request.sessionId,
-        knowledgeContext // Pass knowledge context for prompt augmentation
+        knowledgeContext, // Pass knowledge context for prompt augmentation
+        {
+          userReference,
+          isReferencingOffer,
+          intendedDateTime,
+          intelligentContextSummary: this.intelligentContext.getContextSummary(request.sessionId)
+        }
       );
 
       // Define available tools (without search_knowledge_base - context is pre-injected)
@@ -94,7 +123,7 @@ export class LLMBrain {
 
       // Make single LLM call with augmented context
       const completionParams: any = {
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: messages,
         temperature: 0.7,
         max_tokens: 2000
@@ -134,6 +163,9 @@ export class LLMBrain {
               result: result,
               timestamp: new Date()
             });
+
+            // Record offers for intelligent context tracking
+            this.recordOfferIfApplicable(toolCall.function.name, result, request.sessionId);
           } catch (error) {
             console.error('❌ [LLMBrain] Function call failed:', error);
             functionCalls.push({
@@ -147,18 +179,75 @@ export class LLMBrain {
 
         // If we have function calls, make a follow-up call to get the final response
         if (functionCalls.length > 0) {
+          // CRITICAL FIX: Create one tool response message per tool call ID (OpenAI protocol requirement)
+          const toolResponseMessages = [];
+          
+          // Validate we have the expected number of tool calls
+          if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length !== functionCalls.length) {
+            console.error('❌ [LLMBrain] Tool call count mismatch:', {
+              toolCallsCount: assistantMessage.tool_calls?.length || 0,
+              functionCallsCount: functionCalls.length
+            });
+            
+            // Handle mismatch gracefully
+            const maxCalls = Math.min(
+              assistantMessage.tool_calls?.length || 0, 
+              functionCalls.length
+            );
+            
+            for (let i = 0; i < maxCalls; i++) {
+              const toolCall = assistantMessage.tool_calls![i];
+              const functionCallResult = functionCalls[i];
+              
+              if (!toolCall) {
+                console.error('❌ [LLMBrain] Missing tool call at index:', i);
+                continue;
+              }
+              
+              const result = functionCallResult ? 
+                (functionCallResult.result || { error: 'Tool execution failed' }) : 
+                { error: 'Function call result missing' };
+              
+              toolResponseMessages.push({
+                role: 'tool' as const,
+                content: JSON.stringify(result),
+                tool_call_id: toolCall.id
+              });
+            }
+          } else {
+            // Normal case: create one tool response per tool call
+            for (let i = 0; i < assistantMessage.tool_calls.length; i++) {
+              const toolCall = assistantMessage.tool_calls[i];
+              const functionCallResult = functionCalls[i];
+              
+              if (!toolCall) {
+                console.error('❌ [LLMBrain] Missing tool call at index:', i);
+                continue;
+              }
+              
+              // Ensure we have a result for each tool call
+              const result = functionCallResult ? 
+                (functionCallResult.result || { error: 'Tool execution failed' }) : 
+                { error: 'No result available' };
+              
+              toolResponseMessages.push({
+                role: 'tool' as const,
+                content: JSON.stringify(result),
+                tool_call_id: toolCall.id
+              });
+            }
+          }
+          
+          console.log(`✅ [LLMBrain] Created ${toolResponseMessages.length} tool response messages for ${assistantMessage.tool_calls?.length || 0} tool calls`);
+          
           const followUpMessages = [
             ...messages,
             assistantMessage,
-            {
-              role: 'tool' as const,
-              content: JSON.stringify(functionCalls.map(fc => fc.result)),
-              tool_call_id: assistantMessage.tool_calls?.[0]?.id || 'unknown'
-            }
+            ...toolResponseMessages  // ✅ FIXED: Add all tool response messages
           ];
 
           const followUpCompletion = await this.openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4o',
             messages: followUpMessages,
             temperature: 0.7,
             max_tokens: 2000
@@ -166,6 +255,20 @@ export class LLMBrain {
 
           finalMessage = followUpCompletion.choices[0]?.message?.content || finalMessage;
         }
+      }
+
+      // 🚨 CRITICAL VALIDATION: Prevent hallucinated success responses
+      const validationResult = this.validateResponseIntegrity(finalMessage, functionCalls, request.message, request.sessionId);
+      if (!validationResult.isValid) {
+        console.error('🚨 [LLMBrain] CRITICAL: Detected hallucinated success response:', validationResult.reason);
+        
+        // Override the response with a corrective message
+        finalMessage = validationResult.correctedMessage || "I apologize, but I encountered an issue processing your request. Please try again.";
+        
+        // Log this critical issue for monitoring
+        console.error('🚨 [LLMBrain] Original hallucinated message was:', finalMessage);
+        console.error('🚨 [LLMBrain] Function calls made:', functionCalls.map(fc => fc.name));
+        console.error('🚨 [LLMBrain] User message was:', request.message);
       }
 
       // Store the assistant's response
@@ -211,47 +314,7 @@ export class LLMBrain {
     }
   }
 
-  private async buildChatMessages(
-    currentMessage: string, 
-    conversationHistory: any[], 
-    clinicConfig: ClinicConfig,
-    sessionId: string,
-    knowledgeContext?: any
-  ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-    
-    // System prompt with clinic-specific information and gathered user details
-    const systemPrompt = await this.buildSystemPrompt(clinicConfig, sessionId);
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: systemPrompt
-      }
-    ];
 
-    // Add conversation history (now using smart context from conversation manager)
-    for (const msg of conversationHistory) {
-      messages.push({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content
-      });
-    }
-
-    // Add current message
-    messages.push({
-      role: 'user',
-      content: currentMessage
-    });
-
-    // Add knowledge context if available
-    if (knowledgeContext && knowledgeContext.totalResults > 0) {
-      messages.push({
-        role: 'system',
-        content: `Knowledge context: ${knowledgeContext.query}\n\n${knowledgeContext.results.map((result: any) => `- ${result.question}\n${result.answer}`).join('\n')}`
-      });
-    }
-
-    return messages;
-  }
 
   private async buildSystemPrompt(clinicConfig: ClinicConfig, sessionId: string): Promise<string> {
     const businessHoursText = Object.entries(clinicConfig.businessHours)
@@ -277,6 +340,18 @@ export class LLMBrain {
     const nextTuesday = todayMoment.clone().add(daysUntilTuesday, 'days');
     const formattedNextTuesday = nextTuesday.format('dddd, MMMM Do YYYY');
 
+    // 🚨 CRITICAL FIX: Extract actual businessId from clinic configuration
+    let actualBusinessId = '';
+    try {
+      const credentialsData = typeof clinicConfig.apiCredentials.data === 'string' 
+        ? JSON.parse(clinicConfig.apiCredentials.data)
+        : (clinicConfig.apiCredentials.data || clinicConfig.apiCredentials);
+      actualBusinessId = credentialsData.businessId || '';
+    } catch (error) {
+      // Fallback to direct access
+      actualBusinessId = (clinicConfig.apiCredentials as any).businessId || '';
+    }
+
     // CRITICAL FIX: Get user information summary to provide context to LLM
     const userInfoSummary = this.conversationManager.getUserInformationSummary(sessionId);
 
@@ -298,6 +373,20 @@ export class LLMBrain {
 - When customers mention specific times/dates, immediately call check_availability
 - Base all availability responses on actual function results
 - USE function call results to provide accurate availability information
+
+**🚨 CRITICAL: AVAILABILITY DISPLAY RULE - FOLLOW EVERY TIME 🚨**
+WHENEVER you display appointment availability:
+1. COUNT the total slots in the function result
+2. IF total > 4: Show only FIRST 4 slots + mention remaining count
+3. ALWAYS use this EXACT format for > 4 slots:
+   "Here are your available appointment times:
+   • [TIME] - [PRACTITIONER] ([SERVICE])
+   • [TIME] - [PRACTITIONER] ([SERVICE])
+   • [TIME] - [PRACTITIONER] ([SERVICE])
+   • [TIME] - [PRACTITIONER] ([SERVICE])
+   
+   We have **[X] other available times** if these don't work for you!"
+4. Never show more than 4 slots without mentioning additional ones
 
 **CRITICAL: DATE INTERPRETATION**
 When patients use relative dates, interpret them as the NEXT future occurrence:
@@ -406,10 +495,10 @@ When collecting information from users, ALWAYS use this specific format:
 Could you please provide me with the following details:
 
 - **Your full name**
-- **Your phone number**
-- **Your date of birth** (YYYY-MM-DD format)
+- **Your date of birth** (YYYY-MM-DD format) - required for patient identification
 - **The type of service you need** (Standard Appointment or First Appointment)
-- **Your preferred date and time for the appointment**"
+- **Your preferred date and time for the appointment**
+- **Your phone number** (optional, for appointment reminders)"
 
 **FORMATTING EXAMPLES:**
 When listing appointment times:
@@ -420,24 +509,27 @@ When listing appointment times:
 
 Would you like me to **book one of these times** for you?"
 
-**CRITICAL: AVAILABILITY DISPLAY LIMIT**
-When showing general availability (user asks "sometime [day]", "anytime [day]", etc.):
-- **LIMIT to first 4 available slots** to avoid overwhelming the user
-- **If more than 4 slots available**, add this message after listing the first 4:
+**🚨🚨🚨 MANDATORY AVAILABILITY DISPLAY RULE - FOLLOW EVERY SINGLE TIME 🚨🚨🚨**
 
-"We have **X other available times** if these don't work for you. Just let me know if you'd like to see more options!"
+**STEP 1:** Count slots in function result (TOTAL_SLOTS)
+**STEP 2:** If TOTAL_SLOTS > 4: Show 4 + mention remaining
+**STEP 3:** If TOTAL_SLOTS ≤ 4: Show all
 
-**Example with many slots:**
-"Here are your **available appointment times** for Wednesday, August 6th, 2025:
+**EXACT FORMAT FOR > 4 SLOTS (MANDATORY):**
+"Here are your **available appointment times** for [DATE]:
 
-• **9:00 AM** - Henry Juliano (Standard Appointment) 
-• **10:45 AM** - Henry Juliano (Standard Appointment) 
-• **11:30 AM** - Henry Juliano (Standard Appointment) 
-• **12:15 PM** - Henry Juliano (Standard Appointment) 
+• **[TIME]** - [PRACTITIONER] ([SERVICE])
+• **[TIME]** - [PRACTITIONER] ([SERVICE])  
+• **[TIME]** - [PRACTITIONER] ([SERVICE])
+• **[TIME]** - [PRACTITIONER] ([SERVICE])
 
-We have **5 other available times** if these don't work for you. Just let me know if you'd like to see more options!
+We have **[REMAINING] other available times** if these don't work for you!"
 
-Which time works best for you?"
+**CALCULATION:** REMAINING = TOTAL_SLOTS - 4
+- 8 slots → Show 4 + "We have **4 other available times**"
+- 6 slots → Show 4 + "We have **2 other available times**"
+
+**NEVER SHOW MORE THAN 4 SLOTS WITHOUT MENTIONING ADDITIONAL ONES**
 
 When showing booking confirmation:
 "✅ **Appointment Booked Successfully!**
@@ -485,15 +577,22 @@ You have access to relevant clinic information through context that is automatic
 **CONVERSATION CONTEXT:**
 ${userInfoSummary || 'No previous context for this user.'}
 
+🚨 **CRITICAL IMMEDIATE ACTION RULE FOR ALL OPERATIONS:**
+When a user confirms an action (says "Yes", "Yes please", "Confirm", provides cancellation reason, etc.):
+- **IMMEDIATELY call the appropriate function - NO intermediate messages**
+- **DO NOT say "I will now...", "Please hold on", "Processing", or similar phrases**
+- **CALL THE FUNCTION FIRST, then respond based on the actual result**
+- **Users expect immediate action when they confirm - deliver it**
+
 **APPOINTMENT RESCHEDULE FLOW:**
 When a client wants to reschedule an appointment, follow this exact process:
 
 1. **Gather Required Information:**
    - Ask for their **full name**
-   - Ask for their **phone number**
+   - Ask for their **date of birth** (YYYY-MM-DD format) - required for patient identification
 
 2. **Search for Patient:**
-   - Use the search_patient_for_cancellation function with the name and phone number
+   - Use the search_patient_for_cancellation function with the name and date of birth
    - If no patient found, politely inform them and ask them to double-check the information
    - If patient found, proceed to step 3
 
@@ -526,20 +625,41 @@ When a client wants to reschedule an appointment, follow this exact process:
    - Ask for explicit confirmation: "I'll reschedule your appointment from [OLD] to [NEW]. Is this correct?"
    - Only proceed with rescheduling after receiving clear confirmation
 
+🚨 **CRITICAL: When user says "Yes" or "Yes please" or confirms the reschedule:**
+   - **IMMEDIATELY call reschedule_appointment function - DO NOT generate intermediate messages**
+   - **NO messages like "I will proceed to reschedule" or "Please hold on"**
+   - **DIRECTLY call the function and respond based on the result**
+
 8. **Reschedule the Appointment:**
-   - **CRITICAL**: Extract the appointment ID from the search_patient_for_cancellation function result you received earlier in this conversation
-   - **CRITICAL**: Extract the practitioner ID and service ID from the check_availability function result you just received
-   - **CRITICAL**: Extract the patient ID from the search_patient_for_cancellation function result you received earlier in this conversation
-   - Use the reschedule_appointment function with:
+   🚨 **MANDATORY FUNCTION CALL REQUIREMENT**: 
+   - **YOU MUST CALL the reschedule_appointment function before claiming success**
+   - **NEVER CLAIM an appointment is rescheduled without calling reschedule_appointment**
+   - **NEVER say "successfully rescheduled" unless the function returned success=true**
+   - **WHEN USER CONFIRMS: CALL FUNCTION IMMEDIATELY, NO INTERMEDIATE MESSAGES**
+   
+   - **CRITICAL**: Use the appointment ID from the conversation history (from when you previously called search_patient_for_cancellation)
+   - **CRITICAL**: Use the practitioner ID and service ID from the conversation history (from when you previously called check_availability)
+   - **CRITICAL**: Use the patient ID from the conversation history (from when you previously called search_patient_for_cancellation)
+   - **DO NOT call search_patient_for_cancellation or check_availability again - use the data you already have**
+   - **MANDATORY**: Use the reschedule_appointment function with:
      - **appointmentId**: The EXACT APPOINTMENT ID from the search results
      - **newDate**: The confirmed new date from availability checking 
      - **newTime**: The confirmed new time from availability checking
      - **practitionerId**: The practitionerId from the availability check result (e.g., "1740586886222586607")
      - **serviceId**: The serviceId from the availability check result (e.g., "1740586888823054369")
      - **patientId**: The patient ID from the search results (e.g., "1743684445862371896")
-     - **businessId**:  Use "${businessId}" (extract from clinic configuration)
-   - Provide confirmation of the successful reschedule
+     - **businessId**: Use "auto_detect" (system will handle business ID automatically)
+   - **ONLY AFTER SUCCESSFUL FUNCTION CALL**: Provide confirmation of the successful reschedule
    - Offer any additional assistance
+
+🚨 **CRITICAL FUNCTION CALL RULES FOR RESCHEDULE:**
+- **STEP 8 IS MANDATORY** - You MUST call reschedule_appointment before claiming success
+- **IMMEDIATE ACTION RULE**: When user confirms ("Yes", "Yes please", "Confirm", etc.) → CALL reschedule_appointment IMMEDIATELY
+- **NO INTERMEDIATE MESSAGES**: Don't say "I will reschedule" or "Please hold on" - just DO it
+- If the reschedule_appointment function fails, inform the user it failed
+- If you skip calling reschedule_appointment, the appointment will NOT be rescheduled in the system
+- Patients rely on this system working correctly - false success claims cause real harm
+- **VALIDATION**: Before saying "successfully rescheduled", verify you called reschedule_appointment
 
 **RESCHEDULE FORMATTING EXAMPLES:**
 
@@ -596,10 +716,10 @@ When a client wants to cancel an appointment, follow this exact process:
 
 1. **Gather Required Information:**
    - Ask for their **full name**
-   - Ask for their **phone number**
+   - Ask for their **date of birth** (YYYY-MM-DD format) - required for patient identification
 
 2. **Search for Patient:**
-   - Use the search_patient_for_cancellation function with the name and phone number
+   - Use the search_patient_for_cancellation function with the name and date of birth
    - If no patient found, politely inform them and ask them to double-check the information
    - If patient found, proceed to step 3
 
@@ -623,16 +743,36 @@ When a client wants to cancel an appointment, follow this exact process:
    - Present these options: "feeling better, condition worse, sick, away, work, or other"
    - Wait for their response before proceeding
 
+🚨 **CRITICAL: When user provides cancellation reason:**
+   - **IMMEDIATELY call cancel_appointment function - DO NOT generate intermediate messages**
+   - **NO messages like "I will cancel" or "Processing cancellation"**
+   - **DIRECTLY call the function and respond based on the result**
+
 7. **Cancel the Appointment:**
-   - **CRITICAL**: Extract the appointment ID from the search_patient_for_cancellation function result you just received in this conversation. Do NOT use any example IDs from these instructions.
-   - Use the cancel_appointment function with the **EXACT APPOINTMENT ID** from the search results
+   🚨 **MANDATORY FUNCTION CALL REQUIREMENT**: 
+   - **YOU MUST CALL the cancel_appointment function before claiming success**
+   - **NEVER CLAIM an appointment is cancelled without calling cancel_appointment**
+   - **NEVER say "successfully cancelled" unless the function returned success=true**
+   - **WHEN USER PROVIDES REASON: CALL FUNCTION IMMEDIATELY, NO INTERMEDIATE MESSAGES**
+   
+   - **CRITICAL**: Use the appointment ID from the conversation history (from when you previously called search_patient_for_cancellation). Do NOT call search_patient_for_cancellation again. Do NOT use any example IDs from these instructions.
+   - **MANDATORY**: Use the cancel_appointment function with the **EXACT APPOINTMENT ID** from the search results
    - **REQUIRED**: Find the appointment ID from the search_patient_for_cancellation result in this conversation
    - **REQUIRED**: Look for the "id" field in the appointments array (e.g., "EXAMPLE_ID_123")
    - **REQUIRED**: Copy the exact numeric ID string from the search results - do not use any placeholder text
    - **REQUIRED**: The appointment ID will be a long numeric string like "EXAMPLE_ID_456"
    - Include the appropriate cancellation reason code
-   - Provide confirmation of the cancellation
+   - **ONLY AFTER SUCCESSFUL FUNCTION CALL**: Provide confirmation of the cancellation
    - Offer to help with rebooking if they need a new appointment
+
+🚨 **CRITICAL FUNCTION CALL RULES FOR CANCELLATION:**
+- **STEP 7 IS MANDATORY** - You MUST call cancel_appointment before claiming success
+- **IMMEDIATE ACTION RULE**: When user provides reason → CALL cancel_appointment IMMEDIATELY
+- **NO INTERMEDIATE MESSAGES**: Don't say "I will cancel" or "Processing" - just DO it
+- If the cancel_appointment function fails, inform the user it failed
+- If you skip calling cancel_appointment, the appointment will NOT be cancelled in the system
+- Patients rely on this system working correctly - false success claims cause real harm
+- **VALIDATION**: Before saying "successfully cancelled", verify you called cancel_appointment
 
 **CANCELLATION FORMATTING EXAMPLES:**
 
@@ -798,7 +938,7 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
         type: 'function',
         function: {
           name: 'search_existing_patient',
-          description: 'Search for an existing patient by name and contact details (use when patient says they have booked before)',
+          description: 'Search for an existing patient by name and date of birth (use when patient says they have booked before)',
           parameters: {
             type: 'object',
             properties: {
@@ -806,16 +946,20 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
                 type: 'string',
                 description: 'Full name of the patient'
               },
+              dateOfBirth: {
+                type: 'string',
+                description: 'Patient date of birth in YYYY-MM-DD format (required for accurate patient identification)'
+              },
               patientPhone: {
                 type: 'string',
-                description: 'Patient phone number (optional if email provided)'
+                description: 'Patient phone number (optional, for additional verification)'
               },
               patientEmail: {
                 type: 'string',
-                description: 'Patient email address (optional if phone provided)'
+                description: 'Patient email address (optional, for additional verification)'
               }
             },
-            required: ['patientName']
+            required: ['patientName', 'dateOfBirth']
           }
         }
       },
@@ -896,7 +1040,7 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
         type: 'function',
         function: {
           name: 'search_patient_for_cancellation',
-          description: 'Search for a patient by name and phone number to find their upcoming appointments for cancellation',
+          description: 'Search for a patient by name and date of birth to find their upcoming appointments for cancellation',
           parameters: {
             type: 'object',
             properties: {
@@ -904,12 +1048,12 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
                 type: 'string',
                 description: 'Full name of the patient'
               },
-              phoneNumber: {
+              dateOfBirth: {
                 type: 'string',
-                description: 'Patient phone number'
+                description: 'Patient date of birth in YYYY-MM-DD format'
               }
             },
-            required: ['patientName', 'phoneNumber']
+            required: ['patientName', 'dateOfBirth']
           }
         }
       },
@@ -1472,7 +1616,8 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
     return await bookingAdapter.searchExistingPatient(
       parameters.patientName,
       parameters.patientPhone,
-      parameters.patientEmail
+      parameters.patientEmail,
+      parameters.dateOfBirth
     );
   }
 
@@ -1491,16 +1636,16 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
     try {
       console.log('🔍 [LLMBrain] Searching patient for cancellation:', parameters);
       
-      // Search for patient by name and phone number
-      const patient = await bookingAdapter.searchPatientByNameAndPhone(
+      // Search for patient by name and date of birth
+      const patient = await bookingAdapter.searchPatientByNameAndDOB(
         parameters.patientName,
-        parameters.phoneNumber
+        parameters.dateOfBirth
       );
 
       if (!patient) {
         return {
           success: false,
-          error: 'No patient found with the provided name and phone number. Please check the information and try again.'
+          error: 'No patient found with the provided name and date of birth. Please check the information and try again.'
         };
       }
 
@@ -1760,6 +1905,15 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
       console.log('✅ [LLMBrain] Using correct patient ID from session:', sessionPatientId);
       console.log('⚠️ [LLMBrain] LLM provided patient ID (ignored):', parameters.patientId);
       
+      // 🚨 CRITICAL: Track reschedule operation start to prevent hallucination
+      this.conversationManager.trackRescheduleOperation(
+        sessionId, 
+        parameters.appointmentId, 
+        parameters.newDate, 
+        parameters.newTime, 
+        'pending'
+      );
+      
       // Combine date and time into a proper Date object
       const newDateTime = new Date(`${parameters.newDate}T${parameters.newTime}:00`);
       console.log('🔄 [LLMBrain] Rescheduling to new date/time:', newDateTime.toISOString());
@@ -1771,10 +1925,19 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
         parameters.practitionerId,  // ✅ Pass through practitioner ID from availability check
         parameters.serviceId,       // ✅ Pass through service ID from availability check
         sessionPatientId,           // ✅ FIXED: Use correct patient ID from session storage
-        parameters.businessId       // ✅ Pass through business ID from configuration
+        ''                          // ✅ FIXED: Let adapter use its own resolved businessId
       );
       
       if (result.success) {
+        // 🚨 CRITICAL: Track successful reschedule operation
+        this.conversationManager.trackRescheduleOperation(
+          sessionId, 
+          parameters.appointmentId, 
+          parameters.newDate, 
+          parameters.newTime, 
+          'success'
+        );
+        
         console.log('✅ [LLMBrain] Appointment rescheduled successfully');
         return {
           success: true,
@@ -1784,6 +1947,15 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
           message: 'Appointment successfully rescheduled!'
         };
       } else {
+        // 🚨 CRITICAL: Track failed reschedule operation
+        this.conversationManager.trackRescheduleOperation(
+          sessionId, 
+          parameters.appointmentId, 
+          parameters.newDate, 
+          parameters.newTime, 
+          'failed'
+        );
+        
         console.error('❌ [LLMBrain] Failed to reschedule appointment:', result.error);
         
         // ✅ CRITICAL: Log detailed error information for debugging
@@ -1809,6 +1981,170 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
         error: 'An error occurred while rescheduling the appointment. Please try again.'
       };
     }
+  }
+
+  /**
+   * 🚨 CRITICAL VALIDATION: Detect hallucinated success responses
+   * This method prevents the LLM from claiming operations succeeded without actually calling functions
+   */
+  private validateResponseIntegrity(finalMessage: string, functionCalls: FunctionCall[], userMessage: string, sessionId: string): {
+    isValid: boolean;
+    reason?: string;
+    correctedMessage?: string;
+  } {
+    const lowerMessage = finalMessage.toLowerCase();
+    const lowerUserMessage = userMessage.toLowerCase();
+    
+    // Check for inappropriate intermediate messages when user confirms
+    const userIsConfirming = (
+      lowerUserMessage.includes('yes please') ||
+      lowerUserMessage.includes('yes') ||
+      lowerUserMessage.includes('confirm') ||
+      lowerUserMessage.includes('feeling better') ||
+      lowerUserMessage.includes('condition worse') ||
+      lowerUserMessage.includes('sick') ||
+      lowerUserMessage.includes('away') ||
+      lowerUserMessage.includes('work') ||
+      lowerUserMessage.includes('other')
+    );
+    
+    const hasIntermediateMessage = (
+      lowerMessage.includes('i will proceed') ||
+      lowerMessage.includes('please hold on') ||
+      lowerMessage.includes('i will now') ||
+      lowerMessage.includes('processing') ||
+      lowerMessage.includes('let me process') ||
+      lowerMessage.includes('i will reschedule') ||
+      lowerMessage.includes('i will cancel')
+    );
+    
+    if (userIsConfirming && hasIntermediateMessage && functionCalls.length === 0) {
+      return {
+        isValid: false,
+        reason: 'Generated intermediate message when user confirmed, but no function was called',
+        correctedMessage: "I apologize, but I encountered an issue with your confirmation. Could you please confirm your request again?"
+      };
+    }
+    
+    // Check for reschedule success claims without reschedule_appointment function call
+    const claimsRescheduleSuccess = (
+      lowerMessage.includes('appointment rescheduled successfully') ||
+      lowerMessage.includes('appointment successfully rescheduled') ||
+      lowerMessage.includes('✅') && lowerMessage.includes('rescheduled') ||
+      (lowerMessage.includes('rescheduled') && lowerMessage.includes('successfully'))
+    );
+    
+    const isRescheduleContext = (
+      lowerUserMessage.includes('reschedule') ||
+      lowerUserMessage.includes('move') ||
+      lowerUserMessage.includes('change') ||
+      (lowerUserMessage.includes('yes') && this.hasRecentRescheduleContext(functionCalls))
+    );
+    
+    const hasRescheduleCall = functionCalls.some(fc => fc.name === 'reschedule_appointment');
+    
+    // 🚨 CRITICAL: Additional validation against operation tracking
+    let lastRescheduleStatus = null;
+    if (claimsRescheduleSuccess) {
+      lastRescheduleStatus = this.conversationManager.getLastRescheduleStatus(sessionId);
+    }
+    
+    if (claimsRescheduleSuccess && isRescheduleContext && !hasRescheduleCall) {
+      return {
+        isValid: false,
+        reason: 'Claimed reschedule success without calling reschedule_appointment function',
+        correctedMessage: "I apologize, but I encountered an issue with your reschedule request. Could you please confirm the details again - which appointment would you like to reschedule and to what new date and time?"
+      };
+    }
+    
+    // 🚨 CRITICAL: Check if claiming success but operation tracking shows failure or no operation
+    if (claimsRescheduleSuccess && lastRescheduleStatus && lastRescheduleStatus.status !== 'success') {
+      return {
+        isValid: false,
+        reason: `Claimed reschedule success but operation tracking shows status: ${lastRescheduleStatus.status}`,
+        correctedMessage: "I apologize, but there was an issue with rescheduling your appointment. Let me try again. Could you please confirm the details - which appointment would you like to reschedule and to what new date and time?"
+      };
+    }
+    
+    // Check for cancellation success claims without cancel_appointment function call
+    const claimsCancelSuccess = (
+      lowerMessage.includes('appointment cancelled successfully') ||
+      lowerMessage.includes('appointment successfully cancelled') ||
+      lowerMessage.includes('✅') && lowerMessage.includes('cancelled') ||
+      (lowerMessage.includes('cancelled') && lowerMessage.includes('successfully'))
+    );
+    
+    const isCancelContext = (
+      lowerUserMessage.includes('cancel') ||
+      lowerUserMessage.includes('delete') ||
+      (lowerUserMessage.includes('yes') && this.hasRecentCancelContext(functionCalls))
+    );
+    
+    const hasCancelCall = functionCalls.some(fc => fc.name === 'cancel_appointment');
+    
+    if (claimsCancelSuccess && isCancelContext && !hasCancelCall) {
+      return {
+        isValid: false,
+        reason: 'Claimed cancellation success without calling cancel_appointment function',
+        correctedMessage: "I apologize, but I encountered an issue with your cancellation request. Could you please confirm which appointment you would like to cancel?"
+      };
+    }
+    
+    // Check for booking success claims without book_appointment function call
+    const claimsBookingSuccess = (
+      lowerMessage.includes('appointment booked successfully') ||
+      lowerMessage.includes('appointment successfully booked') ||
+      lowerMessage.includes('✅') && lowerMessage.includes('booked') ||
+      (lowerMessage.includes('booked') && lowerMessage.includes('successfully'))
+    );
+    
+    const isBookingContext = (
+      lowerUserMessage.includes('book') ||
+      lowerUserMessage.includes('schedule') ||
+      (lowerUserMessage.includes('yes') && this.hasRecentBookingContext(functionCalls))
+    );
+    
+    const hasBookingCall = functionCalls.some(fc => 
+      fc.name === 'book_appointment' || 
+      fc.name === 'create_new_patient_booking'
+    );
+    
+    if (claimsBookingSuccess && isBookingContext && !hasBookingCall) {
+      return {
+        isValid: false,
+        reason: 'Claimed booking success without calling booking function',
+        correctedMessage: "I apologize, but I encountered an issue with your booking request. Could you please provide your details again so I can complete the booking?"
+      };
+    }
+    
+    return { isValid: true };
+  }
+  
+  /**
+   * Check if recent function calls suggest we're in a reschedule context
+   */
+  private hasRecentRescheduleContext(functionCalls: FunctionCall[]): boolean {
+    return functionCalls.some(fc => 
+      fc.name === 'search_patient_for_cancellation' || 
+      fc.name === 'check_availability'
+    );
+  }
+  
+  /**
+   * Check if recent function calls suggest we're in a cancel context
+   */
+  private hasRecentCancelContext(functionCalls: FunctionCall[]): boolean {
+    return functionCalls.some(fc => fc.name === 'search_patient_for_cancellation');
+  }
+  
+  /**
+   * Check if recent function calls suggest we're in a booking context
+   */
+  private hasRecentBookingContext(functionCalls: FunctionCall[]): boolean {
+    return functionCalls.some(fc => 
+      fc.name === 'check_availability' || 
+      fc.name === 'search_existing_patient'
+    );
   }
 
   private detectAvailabilityRequest(message: string): boolean {
@@ -2045,6 +2381,179 @@ Remember: Always be helpful, accurate, and efficient in scheduling appointments!
         error: 'Failed to search knowledge base. Please try again or contact our staff for assistance.'
       };
     }
+  }
+
+  /**
+   * Record offers to the intelligent context manager for conversation flow tracking
+   */
+  private recordOfferIfApplicable(functionName: string, result: any, sessionId: string): void {
+    try {
+      // Record availability offers
+      if (functionName === 'check_availability' && result.slots && result.slots.length > 0) {
+        // CRITICAL FIX: Validate slot data before processing
+        const validSlots = result.slots.filter((slot: any): slot is any => {
+          const hasValidStartTime = slot.startTime && 
+            (typeof slot.startTime === 'string' || slot.startTime instanceof Date);
+          if (!hasValidStartTime) {
+            console.warn('⚠️ [IntelligentContext] Skipping slot with invalid startTime:', slot);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validSlots.length === 0) {
+          console.warn('⚠️ [IntelligentContext] No valid slots found to record offer');
+          return;
+        }
+        
+        const processedSlots = validSlots.slice(0, 10).map((slot: any) => {
+          try {
+            // DEFENSIVE: Handle both string and Date objects for startTime
+            const startTime = typeof slot.startTime === 'string' ? 
+              new Date(slot.startTime) : slot.startTime;
+            
+            // Validate the Date object
+            if (isNaN(startTime.getTime())) {
+              console.error('❌ [IntelligentContext] Invalid startTime for slot:', slot.startTime);
+              return null;
+            }
+            
+            const momentObj = moment(startTime);
+            
+            return {
+              date: momentObj.format('YYYY-MM-DD'),
+              time: momentObj.format('HH:mm'),
+              displayTime: slot.displayTime || momentObj.format('h:mm A'),
+              practitioner: slot.practitionerName,
+              service: slot.serviceName
+            };
+          } catch (error) {
+            console.error('❌ [IntelligentContext] Error processing slot:', slot, error);
+            return null;
+          }
+        }).filter((slot: any) => slot !== null); // Remove failed slots
+        
+        if (processedSlots.length === 0) {
+          console.warn('⚠️ [IntelligentContext] No processable slots after validation');
+          return;
+        }
+        
+        // FIXED: Add date and time from first slot for logging compatibility
+        const firstSlot = processedSlots[0];
+        const offer: ConversationOffer = {
+          type: 'availability',
+          offeredAt: new Date(),
+          details: {
+            date: firstSlot.date,    // ✅ FIXED: Add for logging compatibility
+            time: firstSlot.time,    // ✅ FIXED: Add for logging compatibility
+            slots: processedSlots
+          },
+          context: `Offered ${validSlots.length} available appointment times`
+        };
+
+        console.log(`🧠 [IntelligentContext] Recording availability offer with ${processedSlots.length} valid slots`);
+        this.intelligentContext.recordOffer(sessionId, offer);
+      }
+
+      // Record appointment details offers
+      else if ((functionName === 'search_patient_for_cancellation' || functionName === 'search_existing_patient') 
+               && result.appointments && result.appointments.length > 0) {
+        const appointment = result.appointments[0]; // First appointment
+        if (appointment.date && appointment.time) {
+          const offer: ConversationOffer = {
+            type: 'appointment_details',
+            offeredAt: new Date(),
+            details: {
+              date: appointment.date,
+              time: appointment.time,
+              appointmentId: appointment.id
+            },
+            context: `Showed existing appointment details: ${appointment.date} at ${appointment.time}`
+          };
+
+          this.intelligentContext.recordOffer(sessionId, offer);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [IntelligentContext] Failed to record offer:', error);
+    }
+  }
+
+  /**
+   * Build chat messages with intelligent context and proper prompting
+   */
+  private async buildChatMessages(
+    userMessage: string,
+    conversationHistory: any[],
+    clinicConfig: ClinicConfig,
+    sessionId: string,
+    knowledgeContext: any,
+    intelligentContext?: {
+      userReference: UserReference;
+      isReferencingOffer: boolean;
+      intendedDateTime: { date?: string; time?: string } | null;
+      intelligentContextSummary: string;
+    }
+  ): Promise<any[]> {
+    const messages = [];
+
+    // Use the existing comprehensive system prompt and enhance it with intelligent context
+    let systemPrompt = await this.buildSystemPrompt(clinicConfig, sessionId);
+    
+    // Add intelligent context awareness rules to the existing prompt
+    systemPrompt += `
+
+🧠 INTELLIGENT CONVERSATION FLOW ENHANCEMENT:
+1. CONTEXT AWARENESS: Pay attention to what you just offered to the user
+2. REFERENCE RESOLUTION: When users respond with just times (like "9:30") after you showed availability, they're referring to your previous offer
+3. DATE DISTINCTION: Distinguish between birth dates (for patient identification) and appointment dates (for bookings)
+4. CONFIRMATION HANDLING: When users say "yes", "that works", etc., reference what they're confirming`;
+
+    // Add intelligent context if available
+    if (intelligentContext?.intelligentContextSummary) {
+      systemPrompt += intelligentContext.intelligentContextSummary;
+    }
+
+    // Add specific guidance for reference resolution
+    if (intelligentContext?.isReferencingOffer && intelligentContext?.intendedDateTime) {
+      systemPrompt += `\n\nCONTEXT ALERT: The user is responding to your previous offer. 
+They likely want: ${intelligentContext.intendedDateTime.date} at ${intelligentContext.intendedDateTime.time}
+Use this information instead of trying to extract new dates from their message.`;
+    }
+
+    // Note: User information context is already included in buildSystemPrompt
+
+    // Add knowledge context if available
+    if (knowledgeContext?.results && knowledgeContext.results.length > 0) {
+      systemPrompt += '\n\n--- CLINIC KNOWLEDGE BASE ---\n';
+      knowledgeContext.results.forEach((result: any) => {
+        systemPrompt += `Q: ${result.question}\nA: ${result.answer}\n\n`;
+      });
+      systemPrompt += '--- END KNOWLEDGE BASE ---\n';
+    }
+
+    messages.push({
+      role: 'system',
+      content: systemPrompt
+    });
+
+    // Add conversation history
+    conversationHistory.forEach(msg => {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        messages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      }
+    });
+
+    // Add current user message
+    messages.push({
+      role: 'user',
+      content: userMessage
+    });
+
+    return messages;
   }
 
   /**

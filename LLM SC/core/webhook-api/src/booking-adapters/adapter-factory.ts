@@ -61,7 +61,7 @@ export class BookingAdapterFactory {
       
       return this.createMockAdapter(credentials, clinicConfig.id, timezone, bookingSystem, {
         customMessages: {
-          systemDown: scenario.userMessage
+          systemDown: scenario.customMessages?.fallback || 'System unavailable'
         }
       });
     }
@@ -80,7 +80,7 @@ export class BookingAdapterFactory {
         
         return this.createMockAdapter(credentials, clinicConfig.id, timezone, bookingSystem, {
           customMessages: {
-            systemDown: scenario.userMessage
+            systemDown: scenario.customMessages?.fallback || 'System unavailable'
           }
         });
       }
@@ -106,7 +106,7 @@ export class BookingAdapterFactory {
       
       return this.createMockAdapter(credentials, clinicConfig.id, timezone, bookingSystem, {
         customMessages: {
-          systemDown: scenario.userMessage
+          systemDown: scenario.customMessages?.fallback || 'System unavailable'
         }
       });
     }
@@ -124,17 +124,21 @@ export class BookingAdapterFactory {
   ): Promise<BaseBookingAdapter> {
     switch (bookingSystem) {
       case 'cliniko':
-        return new ClinikoAdapter(
+        const clinikoAdapter = new ClinikoAdapter(
           {
             ...credentials,
             apiKey: credentialsData.apiKey || '',
             shard: credentialsData.shard || 'uk2', // Default to uk2
-            businessId: credentialsData.businessId || '',
+            businessId: credentialsData.businessId || '', // Will be resolved if empty
             baseUrl: this.getBaseUrl(bookingSystem, credentialsData.shard || 'uk2')
           },
           clinicId,
           timezone // Use actual timezone from Cliniko business API
         );
+        
+        // Resolve business ID from Cliniko API if not provided
+        await clinikoAdapter.initializeBusinessId();
+        return clinikoAdapter;
 
       case 'jane-app':
         // TODO: Implement Jane App adapter
@@ -174,8 +178,8 @@ export class BookingAdapterFactory {
     console.log(`🎭 [AdapterFactory] Creating mock adapter for ${originalSystem} system`);
     
     const mockOptions: MockBookingOptions = {
-      simulateSlowResponses: process.env.NODE_ENV === 'development',
-      simulateRandomErrors: false,
+      responseDelay: process.env.NODE_ENV === 'development' ? 1000 : 500,
+      simulateFailures: false,
       ...options
     };
 
@@ -230,7 +234,7 @@ export class BookingAdapterFactory {
       const testPromise = adapter.testConnection();
       const result = await Promise.race([testPromise, timeoutPromise]);
       
-      return { success: result.success, error: result.success ? undefined : result.message };
+      return { success: result, error: result ? '' : 'Connection test failed' };
     } catch (error: any) {
       console.warn('⚠️ [AdapterFactory] Connection test failed:', error.message);
       return { success: false, error: error.message };
@@ -278,19 +282,17 @@ export class BookingAdapterFactory {
       
       // Check if this is a mock adapter
       if ('isMockAdapter' in adapter && (adapter as any).isMockAdapter()) {
-        const mockStatus = (adapter as MockBookingAdapter).getMockStatus();
         return {
           success: false, // Mark as false since it's fallback mode
           message: 'System running in fallback mode - booking system unavailable',
           details: {
-            ...result.details,
             mockMode: true,
-            recommendations: mockStatus.recommendations
+            recommendations: ['Check booking system credentials', 'Verify network connectivity']
           }
         };
       }
       
-      return result;
+      return { success: result, message: result ? 'Connection successful' : 'Connection failed', details: {} };
     } catch (error: any) {
       console.error('❌ [AdapterFactory] Connection test failed:', error);
       
@@ -318,8 +320,8 @@ export class BookingAdapterFactory {
     const health = await this.fallbackManager.testSystemHealth();
     
     return {
-      booking: health.booking,
-      overall: health.overall,
+      booking: health.services.bookingSystem,
+      overall: health.isHealthy ? 'healthy' : 'critical',
       fallbackActive: this.fallbackManager.shouldUseMockBooking()
     };
   }

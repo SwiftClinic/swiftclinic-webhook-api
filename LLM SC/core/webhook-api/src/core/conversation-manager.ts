@@ -22,6 +22,27 @@ interface UserInformation {
   validAppointmentIds?: string[];
   lastAppointmentSearch?: Date;
   patientId?: string; // NEW: Patient ID for reschedule operations
+  
+  // 🚨 CRITICAL: Operation tracking to prevent hallucinated success responses
+  operationStatus?: {
+    lastRescheduleAttempt?: {
+      appointmentId: string;
+      newDate: string;
+      newTime: string;
+      status: 'pending' | 'success' | 'failed';
+      timestamp: Date;
+    };
+    lastCancellationAttempt?: {
+      appointmentId: string;
+      status: 'pending' | 'success' | 'failed';
+      timestamp: Date;
+    };
+    lastBookingAttempt?: {
+      status: 'pending' | 'success' | 'failed';
+      timestamp: Date;
+      appointmentId?: string;
+    };
+  };
 }
 
 interface ConversationMetadata {
@@ -1308,5 +1329,106 @@ export class ConversationManager {
   getValidAppointmentIds(sessionId: string): string[] {
     const userInfo = this.userInformation.get(sessionId);
     return userInfo?.validAppointmentIds || [];
+  }
+  
+  /**
+   * 🚨 CRITICAL: Track reschedule operation status to prevent hallucinated success
+   */
+  trackRescheduleOperation(sessionId: string, appointmentId: string, newDate: string, newTime: string, status: 'pending' | 'success' | 'failed'): void {
+    const userInfo = this.userInformation.get(sessionId) || { lastUpdated: new Date() };
+    
+    if (!userInfo.operationStatus) {
+      userInfo.operationStatus = {};
+    }
+    
+    userInfo.operationStatus.lastRescheduleAttempt = {
+      appointmentId,
+      newDate,
+      newTime,
+      status,
+      timestamp: new Date()
+    };
+    
+    userInfo.lastUpdated = new Date();
+    this.userInformation.set(sessionId, userInfo);
+    
+    console.log(`📊 [ConversationManager] Tracked reschedule operation: ${status} for appointment ${appointmentId}`);
+  }
+  
+  /**
+   * 🚨 CRITICAL: Track cancellation operation status to prevent hallucinated success
+   */
+  trackCancellationOperation(sessionId: string, appointmentId: string, status: 'pending' | 'success' | 'failed'): void {
+    const userInfo = this.userInformation.get(sessionId) || { lastUpdated: new Date() };
+    
+    if (!userInfo.operationStatus) {
+      userInfo.operationStatus = {};
+    }
+    
+    userInfo.operationStatus.lastCancellationAttempt = {
+      appointmentId,
+      status,
+      timestamp: new Date()
+    };
+    
+    userInfo.lastUpdated = new Date();
+    this.userInformation.set(sessionId, userInfo);
+    
+    console.log(`📊 [ConversationManager] Tracked cancellation operation: ${status} for appointment ${appointmentId}`);
+  }
+  
+  /**
+   * 🚨 CRITICAL: Track booking operation status to prevent hallucinated success
+   */
+  trackBookingOperation(sessionId: string, status: 'pending' | 'success' | 'failed', appointmentId?: string): void {
+    const userInfo = this.userInformation.get(sessionId) || { lastUpdated: new Date() };
+    
+    if (!userInfo.operationStatus) {
+      userInfo.operationStatus = {};
+    }
+    
+    userInfo.operationStatus.lastBookingAttempt = {
+      status,
+      timestamp: new Date(),
+      ...(appointmentId && { appointmentId })
+    };
+    
+    userInfo.lastUpdated = new Date();
+    this.userInformation.set(sessionId, userInfo);
+    
+    console.log(`📊 [ConversationManager] Tracked booking operation: ${status}${appointmentId ? ` (ID: ${appointmentId})` : ''}`);
+  }
+  
+  /**
+   * 🚨 CRITICAL: Get last reschedule operation status
+   */
+  getLastRescheduleStatus(sessionId: string): { status: 'pending' | 'success' | 'failed'; timestamp: Date } | null {
+    const userInfo = this.userInformation.get(sessionId);
+    return userInfo?.operationStatus?.lastRescheduleAttempt ? {
+      status: userInfo.operationStatus.lastRescheduleAttempt.status,
+      timestamp: userInfo.operationStatus.lastRescheduleAttempt.timestamp
+    } : null;
+  }
+  
+  /**
+   * 🚨 CRITICAL: Get last cancellation operation status
+   */
+  getLastCancellationStatus(sessionId: string): { status: 'pending' | 'success' | 'failed'; timestamp: Date } | null {
+    const userInfo = this.userInformation.get(sessionId);
+    return userInfo?.operationStatus?.lastCancellationAttempt ? {
+      status: userInfo.operationStatus.lastCancellationAttempt.status,
+      timestamp: userInfo.operationStatus.lastCancellationAttempt.timestamp
+    } : null;
+  }
+  
+  /**
+   * 🚨 CRITICAL: Get last booking operation status
+   */
+  getLastBookingStatus(sessionId: string): { status: 'pending' | 'success' | 'failed'; timestamp: Date } | null {
+    const userInfo = this.userInformation.get(sessionId);
+    return userInfo?.operationStatus?.lastBookingAttempt ? {
+      status: userInfo.operationStatus.lastBookingAttempt.status,
+      timestamp: userInfo.operationStatus.lastBookingAttempt.timestamp
+    } : null;
   }
 } 

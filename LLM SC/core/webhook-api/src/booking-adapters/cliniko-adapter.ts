@@ -175,6 +175,99 @@ export class ClinikoAdapter extends BaseBookingAdapter {
     }
   }
 
+  /**
+   * Initialize business ID and timezone by fetching them from Cliniko API
+   * This method should be called after adapter creation to resolve the real business information
+   */
+  async initializeBusinessId(): Promise<void> {
+    if (!this.credentials.businessId || this.credentials.businessId === 'auto_detect' || this.credentials.businessId === '') {
+      console.log('🔍 [ClinikoAdapter] Resolving business information from Cliniko API...');
+      try {
+        const { businessId, timezone } = await this.getBusinessInfo();
+        this.credentials.businessId = businessId;
+        this.timezone = timezone; // Update adapter timezone with real business timezone
+        
+        console.log(`✅ [ClinikoAdapter] Resolved business ID: ${businessId}`);
+        console.log(`✅ [ClinikoAdapter] Resolved timezone: ${timezone}`);
+      } catch (error) {
+        console.error('❌ [ClinikoAdapter] Failed to resolve business information:', error);
+        throw new Error(`Failed to resolve business information: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      console.log(`✅ [ClinikoAdapter] Using configured business ID: ${this.credentials.businessId}`);
+      console.log(`✅ [ClinikoAdapter] Using configured timezone: ${this.timezone}`);
+    }
+  }
+
+  /**
+   * Get the business information (ID and timezone) from Cliniko API
+   * Fetches the list of businesses associated with this API key and returns the first one
+   */
+  async getBusinessInfo(): Promise<{ businessId: string; timezone: string }> {
+    try {
+      console.log('🔍 [ClinikoAdapter] Fetching business information from Cliniko API...');
+      const response = await this.api.get('/businesses');
+      
+      const businesses = response.data.businesses || [];
+      console.log(`🏢 [ClinikoAdapter] Found ${businesses.length} businesses`);
+      
+      if (businesses.length === 0) {
+        throw new Error('No businesses found for this API key');
+      }
+      
+      // Use the first business (most common case is single business per API key)
+      const business = businesses[0];
+      const businessId = business.id.toString();
+      const rawTimezone = business.time_zone || 'UTC'; // Extract timezone from business data
+      const timezone = this.mapClinikoTimezoneToIANA(rawTimezone); // Map to IANA format
+      
+      console.log(`🏢 [ClinikoAdapter] Selected business: ${business.name} (ID: ${businessId})`);
+      console.log(`🌍 [ClinikoAdapter] Business timezone: ${rawTimezone} -> ${timezone}`);
+      
+      return { businessId, timezone };
+    } catch (error: any) {
+      console.error('❌ [ClinikoAdapter] Failed to get business information:', this.formatErrorMessage(error));
+      
+      // Try with fresh API client if we got a 401 error
+      if (error.response?.status === 401) {
+        console.log('🔄 [ClinikoAdapter] Retrying getBusinessInfo() with fresh API client...');
+        try {
+          const freshApi = this.createFreshAPIClient();
+          const freshResponse = await freshApi.get('/businesses');
+          
+          console.log('✅ [ClinikoAdapter] getBusinessInfo() SUCCESS with fresh client');
+          
+          const businesses = freshResponse.data.businesses || [];
+          if (businesses.length === 0) {
+            throw new Error('No businesses found for this API key');
+          }
+          
+          const business = businesses[0];
+          const rawTimezone = business.time_zone || 'UTC';
+          return {
+            businessId: business.id.toString(),
+            timezone: this.mapClinikoTimezoneToIANA(rawTimezone)
+          };
+          
+        } catch (freshError: any) {
+          console.error('❌ [ClinikoAdapter] Fresh API client also failed:', freshError.message);
+          throw freshError;
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get the business ID from Cliniko API (legacy method for backward compatibility)
+   * @deprecated Use getBusinessInfo() instead to get both business ID and timezone
+   */
+  async getBusinessId(): Promise<string> {
+    const { businessId } = await this.getBusinessInfo();
+    return businessId;
+  }
+
   async getAvailableSlots(params: AppointmentSearchParams): Promise<AvailableSlot[]> {
     console.log('🔍 [ClinikoAdapter] getAvailableSlots called with params:', JSON.stringify(params, null, 2));
     console.log(`🕐 [ClinikoAdapter] Using timezone: ${this.timezone} for availability search`);
@@ -894,10 +987,14 @@ export class ClinikoAdapter extends BaseBookingAdapter {
         console.log('✅ [ClinikoAdapter] Including patient_id in reschedule:', patientId);
       }
 
-      // ✅ CRITICAL: Include business_id from configuration
-      if (businessId) {
+      // ✅ CRITICAL: Include business_id from configuration (with fallback to adapter's businessId)
+      if (businessId && businessId !== '${businessId}' && businessId !== '') {
         updatePayload.business_id = businessId;
         console.log('✅ [ClinikoAdapter] Including business_id in reschedule:', businessId);
+      } else {
+        // Fallback to adapter's own businessId if parameter is invalid
+        updatePayload.business_id = this.credentials.businessId;
+        console.log('✅ [ClinikoAdapter] Using adapter businessId as fallback:', this.credentials.businessId);
       }
 
       console.log('🔄 [ClinikoAdapter] Reschedule payload:', updatePayload);
@@ -1373,30 +1470,52 @@ export class ClinikoAdapter extends BaseBookingAdapter {
 
   /**
    * Search for an existing patient by name and contact details
+   * Using proper Cliniko API q[] filtering as per documentation
+   * Priority: Full Name + Date of Birth matching
    */
   async searchExistingPatient(
     patientName: string,
     patientPhone?: string,
-    patientEmail?: string
+    patientEmail?: string,
+    dateOfBirth?: string
   ): Promise<ClinikoPatient | null> {
     try {
-      console.log('🔍 [ClinikoAdapter] Searching for existing patient:', { patientName, hasPhone: !!patientPhone, hasEmail: !!patientEmail });
+      console.log('🔍 [ClinikoAdapter] Searching for existing patient:', { patientName, hasPhone: !!patientPhone, hasEmail: !!patientEmail, hasDateOfBirth: !!dateOfBirth });
 
-      // Parse name into first and last name for proper field filtering
+      // Parse name into first and last name for proper q[] filtering
       const [firstName, ...lastNameParts] = patientName.trim().split(' ');
       const lastName = lastNameParts.length > 0 ? lastNameParts.join(' ') : '';
       
-      // Build search parameters using field-based filtering
+      // Build search parameters using Cliniko API q[] filtering
       const searchParams: any = { per_page: 50 };
       
-      if (firstName) {
-        searchParams.first_name = firstName;
-      }
-      if (lastName) {
-        searchParams.last_name = lastName;
+      // Use proper Cliniko q[] array syntax with multiple q[] parameters
+      const qFilters: string[] = [];
+      
+      // Add date of birth filter first - highest priority for matching
+      if (dateOfBirth) {
+        qFilters.push(`date_of_birth:=${dateOfBirth}`);
       }
       
-      console.log('🔍 [ClinikoAdapter] Using field-based search with params:', searchParams);
+      if (firstName) {
+        qFilters.push(`first_name:=${firstName}`);
+      }
+      
+      if (lastName) {
+        qFilters.push(`last_name:=${lastName}`);
+      }
+      
+      // Add contact filters if provided
+      if (patientEmail) {
+        qFilters.push(`email:=${patientEmail}`);
+      }
+      
+      // Apply proper q[] array syntax - multiple parameters with same name
+      if (qFilters.length > 0) {
+        searchParams['q[]'] = qFilters;
+      }
+      
+      console.log('🔍 [ClinikoAdapter] Using Cliniko q[] array filtering with params:', searchParams);
       
       try {
         const response = await this.api.get('/patients', {
@@ -1404,62 +1523,48 @@ export class ClinikoAdapter extends BaseBookingAdapter {
         });
         
         const patients: ClinikoPatient[] = response.data.patients || [];
-        console.log(`🔍 [ClinikoAdapter] Found ${patients.length} patients matching name search`);
+        console.log(`🔍 [ClinikoAdapter] Found ${patients.length} patients using q[] array filtering`);
         
         if (patients.length === 0) {
-          return null;
-        }
-
-        // If phone provided, try to match by phone
-        if (patientPhone) {
-          const cleanPhone = patientPhone.replace(/\s+/g, '').replace(/[-()]/g, '');
-          const phoneMatch = patients.find(p => {
-            // Handle both old format (phone_number) and new format (patient_phone_numbers array)
-            if (p.patient_phone_numbers && Array.isArray(p.patient_phone_numbers)) {
-              // New format: check all phone numbers in the array
-              return p.patient_phone_numbers.some(phoneObj => {
-                if (!phoneObj.number) return false;
-                const cleanPatientPhone = phoneObj.number.replace(/\s+/g, '').replace(/[-()]/g, '');
-                return cleanPatientPhone === cleanPhone; // FIXED: Exact match only
-              });
-            } else if (p.phone_number) {
-              // Old format: single phone_number field
-              const cleanPatientPhone = p.phone_number.replace(/\s+/g, '').replace(/[-()]/g, '');
-              return cleanPatientPhone === cleanPhone; // FIXED: Exact match only
-            }
-            return false;
+          // Fallback: Try name-only search if no results
+          console.log('❌ [ClinikoAdapter] No patients found with combined filters - trying name-only fallback');
+          
+          const fallbackParams: any = { per_page: 50 };
+          const fallbackFilters: string[] = [];
+          
+          if (firstName) {
+            fallbackFilters.push(`first_name:=${firstName}`);
+          }
+          if (lastName) {
+            fallbackFilters.push(`last_name:=${lastName}`);
+          }
+          
+          if (fallbackFilters.length > 0) {
+            fallbackParams['q[]'] = fallbackFilters;
+          }
+          
+          console.log('🔍 [ClinikoAdapter] Trying name-only fallback search:', fallbackParams);
+          
+          const fallbackResponse = await this.api.get('/patients', {
+            params: fallbackParams
           });
-          if (phoneMatch) {
-            console.log('✅ [ClinikoAdapter] Found patient by name + phone match:', phoneMatch.id);
-            return phoneMatch;
+          
+          const fallbackPatients: ClinikoPatient[] = fallbackResponse.data.patients || [];
+          console.log(`🔍 [ClinikoAdapter] Fallback search found ${fallbackPatients.length} patients by name only`);
+          
+          if (fallbackPatients.length === 0) {
+            return null;
           }
+          
+          // Use fallback results for further matching
+          return this.findBestContactMatch(fallbackPatients, patientName, patientPhone, patientEmail, dateOfBirth);
         }
 
-        // If email provided, try to match by email
-        if (patientEmail) {
-          const emailMatch = patients.find(p => 
-            p.email && p.email.toLowerCase() === patientEmail.toLowerCase()
-          );
-          if (emailMatch) {
-            console.log('✅ [ClinikoAdapter] Found patient by name + email match:', emailMatch.id);
-            return emailMatch;
-          }
-        }
-
-        // If no phone/email match, return exact name match if available
-        const exactNameMatch = patients.find(p => 
-          `${p.first_name} ${p.last_name}`.toLowerCase() === patientName.toLowerCase()
-        );
-        if (exactNameMatch) {
-          console.log('✅ [ClinikoAdapter] Found patient by exact name match:', exactNameMatch.id);
-          return exactNameMatch;
-        }
-
-        console.log('⚠️ [ClinikoAdapter] Found name matches but no phone/email confirmation');
-        return null;
+        // Find best match from q[] filtered results
+        return this.findBestContactMatch(patients, patientName, patientPhone, patientEmail, dateOfBirth);
 
       } catch (searchError: any) {
-        console.error('❌ [ClinikoAdapter] Patient search failed:', searchError.response?.data || searchError.message);
+        console.error('❌ [ClinikoAdapter] Patient search with q[] array filtering failed:', searchError.response?.data || searchError.message);
         return null;
       }
 
@@ -1470,7 +1575,105 @@ export class ClinikoAdapter extends BaseBookingAdapter {
   }
 
   /**
+   * Helper method to find the best contact match among patients
+   * Priority: Full Name + Date of Birth matching
+   */
+  private findBestContactMatch(
+    patients: ClinikoPatient[], 
+    patientName: string, 
+    patientPhone?: string, 
+    patientEmail?: string,
+    dateOfBirth?: string
+  ): ClinikoPatient | null {
+    if (patients.length === 0) return null;
+    
+    // PRIORITY 1: Full Name + Date of Birth match (highest priority)
+    if (dateOfBirth) {
+      const nameAndDobMatch = patients.find(p => {
+        const fullNameMatch = `${p.first_name} ${p.last_name}`.toLowerCase() === patientName.toLowerCase();
+        const dobMatch = p.date_of_birth === dateOfBirth;
+        return fullNameMatch && dobMatch;
+      });
+      if (nameAndDobMatch) {
+        console.log('✅ [ClinikoAdapter] Found patient by exact name + DOB match:', nameAndDobMatch.id);
+        return nameAndDobMatch;
+      }
+      
+      // Fallback: DOB + name similarity match
+      const dobAndNameSimilarityMatch = patients.find(p => {
+        if (p.date_of_birth !== dateOfBirth) return false;
+        const bestNameMatch = this.findBestNameMatch([p], patientName);
+        return bestNameMatch !== null;
+      });
+      if (dobAndNameSimilarityMatch) {
+        console.log('✅ [ClinikoAdapter] Found patient by DOB + name similarity match:', dobAndNameSimilarityMatch.id);
+        return dobAndNameSimilarityMatch;
+      }
+    }
+
+    // PRIORITY 2: If phone provided, try to match by exact name + phone
+    if (patientPhone) {
+      const cleanPhone = patientPhone.replace(/\s+/g, '').replace(/[-()]/g, '');
+      const phoneMatch = patients.find(p => {
+        // First check if name matches exactly
+        const nameMatch = `${p.first_name} ${p.last_name}`.toLowerCase() === patientName.toLowerCase();
+        if (!nameMatch) return false;
+        
+        // Then check phone match
+        if (p.patient_phone_numbers && Array.isArray(p.patient_phone_numbers)) {
+          return p.patient_phone_numbers.some(phoneObj => {
+            if (!phoneObj.number) return false;
+            const cleanPatientPhone = phoneObj.number.replace(/\s+/g, '').replace(/[-()]/g, '');
+            return cleanPatientPhone === cleanPhone;
+          });
+        } else if (p.phone_number) {
+          const cleanPatientPhone = p.phone_number.replace(/\s+/g, '').replace(/[-()]/g, '');
+          return cleanPatientPhone === cleanPhone;
+        }
+        return false;
+      });
+      if (phoneMatch) {
+        console.log('✅ [ClinikoAdapter] Found patient by exact name + phone match:', phoneMatch.id);
+        return phoneMatch;
+      }
+    }
+
+    // PRIORITY 3: If email provided, try to match by exact name + email
+    if (patientEmail) {
+      const emailMatch = patients.find(p => {
+        const nameMatch = `${p.first_name} ${p.last_name}`.toLowerCase() === patientName.toLowerCase();
+        const emailMatches = p.email && p.email.toLowerCase() === patientEmail.toLowerCase();
+        return nameMatch && emailMatches;
+      });
+      if (emailMatch) {
+        console.log('✅ [ClinikoAdapter] Found patient by exact name + email match:', emailMatch.id);
+        return emailMatch;
+      }
+    }
+
+    // PRIORITY 4: Exact name match only (if no DOB/contact info available)
+    const exactNameMatch = patients.find(p => 
+      `${p.first_name} ${p.last_name}`.toLowerCase() === patientName.toLowerCase()
+    );
+    if (exactNameMatch) {
+      console.log('✅ [ClinikoAdapter] Found patient by exact name match only:', exactNameMatch.id);
+      return exactNameMatch;
+    }
+
+    // PRIORITY 5: Best name similarity match (last resort)
+    const bestNameMatch = this.findBestNameMatch(patients, patientName);
+    if (bestNameMatch) {
+      console.log('✅ [ClinikoAdapter] Found patient by name similarity match:', bestNameMatch.id);
+      return bestNameMatch;
+    }
+
+    console.log('⚠️ [ClinikoAdapter] Found patients but no suitable match');
+    return null;
+  }
+
+  /**
    * Search for a patient by name and date of birth (for cancellation flow)
+   * Using proper Cliniko API q[] filtering as per documentation
    */
   async searchPatientByNameAndDOB(
     patientName: string,
@@ -1479,24 +1682,37 @@ export class ClinikoAdapter extends BaseBookingAdapter {
     try {
       console.log('🔍 [ClinikoAdapter] Searching for patient by name and DOB:', { patientName, dateOfBirth });
 
-      // Parse name into first and last name for proper field filtering
+      // Parse name into first and last name for proper q[] filtering
       const [firstName, ...lastNameParts] = patientName.trim().split(' ');
       const lastName = lastNameParts.length > 0 ? lastNameParts.join(' ') : '';
       
-      // Build search parameters using field-based filtering
+      // Build search parameters using Cliniko API q[] filtering
       const searchParams: any = { 
-        per_page: 50,
-        date_of_birth: dateOfBirth // Search by date of birth
+        per_page: 50
       };
       
-      if (firstName) {
-        searchParams.first_name = firstName;
-      }
-      if (lastName) {
-        searchParams.last_name = lastName;
+      // Use proper Cliniko q[] array syntax
+      const qFilters: string[] = [];
+      
+      // Add date of birth filter - this is the most specific filter
+      if (dateOfBirth) {
+        qFilters.push(`date_of_birth:=${dateOfBirth}`);
       }
       
-      console.log('🔍 [ClinikoAdapter] Using name + DOB search with params:', searchParams);
+      // Add name filters using proper q[] syntax
+      if (firstName) {
+        qFilters.push(`first_name:=${firstName}`);
+      }
+      if (lastName) {
+        qFilters.push(`last_name:=${lastName}`);
+      }
+      
+      // Apply proper q[] array syntax - multiple parameters with same name
+      if (qFilters.length > 0) {
+        searchParams['q[]'] = qFilters;
+      }
+      
+      console.log('🔍 [ClinikoAdapter] Using Cliniko q[] array filtering with params:', searchParams);
       
       try {
         const response = await this.api.get('/patients', {
@@ -1504,14 +1720,43 @@ export class ClinikoAdapter extends BaseBookingAdapter {
         });
         
         const patients: ClinikoPatient[] = response.data.patients || [];
-        console.log(`🔍 [ClinikoAdapter] Found ${patients.length} patients matching name + DOB search`);
+        console.log(`🔍 [ClinikoAdapter] Found ${patients.length} patients using q[] array filtering`);
         
         if (patients.length === 0) {
-          console.log('❌ [ClinikoAdapter] No patients found with matching name and DOB');
+          console.log('❌ [ClinikoAdapter] No patients found with combined filters - trying DOB-only fallback');
+          
+          // Fallback: Try search with just date of birth if name search fails
+          const fallbackParams = {
+            per_page: 50,
+            'q[]': [`date_of_birth:=${dateOfBirth}`]
+          };
+          
+          console.log('🔍 [ClinikoAdapter] Trying DOB-only fallback search:', fallbackParams);
+          
+          const fallbackResponse = await this.api.get('/patients', {
+            params: fallbackParams
+          });
+          
+          const fallbackPatients: ClinikoPatient[] = fallbackResponse.data.patients || [];
+          console.log(`🔍 [ClinikoAdapter] Fallback search found ${fallbackPatients.length} patients by DOB`);
+          
+          if (fallbackPatients.length === 0) {
+            console.log('❌ [ClinikoAdapter] No patients found even with DOB-only search');
+            return null;
+          }
+          
+          // Find best name match among DOB matches
+          const bestMatch = this.findBestNameMatch(fallbackPatients, patientName);
+          if (bestMatch) {
+            console.log('✅ [ClinikoAdapter] Found patient via DOB fallback with name similarity:', bestMatch.id);
+            return bestMatch;
+          }
+          
+          console.log('❌ [ClinikoAdapter] No suitable name match found in DOB results');
           return null;
         }
 
-        // Find exact name and DOB match
+        // Find exact match first
         const exactMatch = patients.find(p => {
           const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
           const nameMatch = fullName === patientName.toLowerCase();
@@ -1520,22 +1765,22 @@ export class ClinikoAdapter extends BaseBookingAdapter {
         });
 
         if (exactMatch) {
-          console.log('✅ [ClinikoAdapter] Found exact patient match by name + DOB:', exactMatch.id);
+          console.log('✅ [ClinikoAdapter] Found exact patient match via q[] array filtering:', exactMatch.id);
           return exactMatch;
         }
 
-        // If no exact match, check if any patient has matching DOB
-        const dobMatch = patients.find(p => p.date_of_birth === dateOfBirth);
-        if (dobMatch) {
-          console.log('✅ [ClinikoAdapter] Found patient match by DOB (name similarity):', dobMatch.id);
-          return dobMatch;
+        // If no exact match, find best match
+        const bestMatch = this.findBestNameMatch(patients, patientName);
+        if (bestMatch && bestMatch.date_of_birth === dateOfBirth) {
+          console.log('✅ [ClinikoAdapter] Found best patient match via q[] array filtering:', bestMatch.id);
+          return bestMatch;
         }
 
-        console.log('❌ [ClinikoAdapter] No exact match found for name + DOB combination');
+        console.log('❌ [ClinikoAdapter] No suitable match found with q[] array filtering');
         return null;
 
       } catch (searchError: any) {
-        console.error('❌ [ClinikoAdapter] Patient search by name + DOB failed:', searchError.response?.data || searchError.message);
+        console.error('❌ [ClinikoAdapter] Patient search with q[] array filtering failed:', searchError.response?.data || searchError.message);
         return null;
       }
 
@@ -1546,7 +1791,52 @@ export class ClinikoAdapter extends BaseBookingAdapter {
   }
 
   /**
-   * Search for a patient by name and phone number (for cancellation flow)
+   * Helper method to find the best name match among patients
+   */
+  private findBestNameMatch(patients: ClinikoPatient[], targetName: string): ClinikoPatient | null {
+    if (patients.length === 0) return null;
+    
+    const targetLower = targetName.toLowerCase().trim();
+    
+    // First, try exact match
+    const exactMatch = patients.find(p => {
+      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+      return fullName === targetLower;
+    });
+    
+    if (exactMatch) return exactMatch;
+    
+    // Then try partial matches - score by how many name parts match
+    let bestMatch: ClinikoPatient | null = null;
+    let bestScore = 0;
+    
+    const targetParts = targetLower.split(' ').filter(part => part.length > 0);
+    
+    for (const patient of patients) {
+      const patientName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+      const patientParts = patientName.split(' ').filter(part => part.length > 0);
+      
+      let score = 0;
+      for (const targetPart of targetParts) {
+        for (const patientPart of patientParts) {
+          if (patientPart.includes(targetPart) || targetPart.includes(patientPart)) {
+            score += 1;
+          }
+        }
+      }
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = patient;
+      }
+    }
+    
+    // Only return if we have a reasonable match (at least 1 name part matches)
+    return bestScore > 0 && bestMatch ? bestMatch : null;
+  }
+
+  /**
+   * Search for a patient by name and phone number (for cancellation flow) - DEPRECATED: Use searchPatientByNameAndDOB instead
    */
   async searchPatientByNameAndPhone(
     patientName: string,
@@ -1555,23 +1845,48 @@ export class ClinikoAdapter extends BaseBookingAdapter {
     try {
       console.log('🔍 [ClinikoAdapter] Searching for patient by name and phone:', { patientName, phoneNumber });
 
-      // Parse name into first and last name for proper field filtering
-      const [firstName, ...lastNameParts] = patientName.trim().split(' ');
-      const lastName = lastNameParts.length > 0 ? lastNameParts.join(' ') : '';
+      // Implement the correct Cliniko API approach based on official documentation
+      // Step 1: Search for contacts by phone number first (recommended approach)
+      // Step 2: Then search patients by full_name with wildcard syntax
       
-      // Build search parameters using field-based filtering
+      console.log('🔍 [ClinikoAdapter] Starting two-step patient search process');
+      
+      // Step 1: Search contacts endpoint for phone number
+      let patientId = null;
+      try {
+        const normalizedPhone = phoneNumber.replace(/\s+/g, '').replace(/[-()]/g, '');
+        console.log('🔍 [ClinikoAdapter] Step 1: Searching contacts by phone:', normalizedPhone);
+        
+        const contactResponse = await this.api.get('/contacts', {
+          params: { 
+            'q[]': `phone_numbers.normalized_number:=${normalizedPhone}`,  // EXACT syntax from documentation
+            per_page: 50
+          }
+        });
+        
+        const contacts = contactResponse.data.contacts || [];
+        console.log(`🔍 [ClinikoAdapter] Found ${contacts.length} contacts with matching phone`);
+        
+        // Look for patient_id in contact records
+        for (const contact of contacts) {
+          if (contact.patient_id) {
+            patientId = contact.patient_id;
+            console.log('✅ [ClinikoAdapter] Found patient_id from contact:', patientId);
+            break;
+          }
+        }
+      } catch (contactError: any) {
+        console.log('⚠️ [ClinikoAdapter] Contact search failed, will try name-only search:', contactError.response?.data || contactError.message);
+      }
+      
+      // Step 2: Search patients by full_name using EXACT documentation syntax
+      console.log('🔍 [ClinikoAdapter] Step 2: Searching patients by full name with wildcard');
       const searchParams: any = { 
-        per_page: 50
+        per_page: 50,
+        'q[]': `full_name:~%${patientName}%`  // EXACT syntax from documentation: field:~%value%
       };
       
-      if (firstName) {
-        searchParams.first_name = firstName;
-      }
-      if (lastName) {
-        searchParams.last_name = lastName;
-      }
-      
-      console.log('🔍 [ClinikoAdapter] Using name search with params:', searchParams);
+      console.log('🔍 [ClinikoAdapter] Using EXACT documentation syntax for full_name search:', searchParams);
       
       try {
         const response = await this.api.get('/patients', {
@@ -1586,10 +1901,19 @@ export class ClinikoAdapter extends BaseBookingAdapter {
           return null;
         }
 
-        // Clean the provided phone number for comparison
+        // If we found a patient_id from contact search, look for that specific patient first
+        if (patientId) {
+          const specificPatient = patients.find(p => p.id === patientId);
+          if (specificPatient) {
+            console.log('✅ [ClinikoAdapter] Found exact patient match using contact-derived patient_id:', patientId);
+            return specificPatient;
+          }
+        }
+
+        // Fallback: Clean the provided phone number for comparison and search by name + phone
         const cleanPhone = phoneNumber.replace(/\s+/g, '').replace(/[-()]/g, '');
         
-        // Find patient with matching name and phone number
+        // Find patient with matching name and date of birth
         const phoneMatch = patients.find(p => {
           const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
           const nameMatch = fullName === patientName.toLowerCase();
@@ -2311,6 +2635,60 @@ export class ClinikoAdapter extends BaseBookingAdapter {
       console.error('❌ [ClinikoAdapter] Error in findOrCreatePatient:', error);
       throw new Error(`Failed to find or create patient: ${error.message}`);
     }
+  }
+
+  /**
+   * Map Cliniko timezone names to proper IANA timezone identifiers
+   */
+  private mapClinikoTimezoneToIANA(clinikoTimezone: string): string {
+    const timezoneMap: Record<string, string> = {
+      // UK/Ireland
+      'London': 'Europe/London',
+      'Belfast': 'Europe/London',
+      'Dublin': 'Europe/Dublin',
+      'Edinburgh': 'Europe/London',
+      
+      // Australia
+      'Adelaide': 'Australia/Adelaide',
+      'Brisbane': 'Australia/Brisbane', 
+      'Darwin': 'Australia/Darwin',
+      'Hobart': 'Australia/Hobart',
+      'Melbourne': 'Australia/Melbourne',
+      'Perth': 'Australia/Perth',
+      'Sydney': 'Australia/Sydney',
+      
+      // New Zealand
+      'Auckland': 'Pacific/Auckland',
+      'Wellington': 'Pacific/Auckland',
+      
+      // North America
+      'New York': 'America/New_York',
+      'Los Angeles': 'America/Los_Angeles',
+      'Chicago': 'America/Chicago',
+      'Denver': 'America/Denver',
+      'Toronto': 'America/Toronto',
+      'Vancouver': 'America/Vancouver',
+      
+      // Europe
+      'Paris': 'Europe/Paris',
+      'Berlin': 'Europe/Berlin',
+      'Rome': 'Europe/Rome',
+      'Amsterdam': 'Europe/Amsterdam',
+      'Madrid': 'Europe/Madrid',
+      'Zurich': 'Europe/Zurich',
+      
+      // Fallbacks
+      'UTC': 'UTC',
+      'GMT': 'UTC'
+    };
+    
+    const mapped = timezoneMap[clinikoTimezone];
+    if (!mapped) {
+      console.warn(`⚠️ [ClinikoAdapter] Unknown timezone: ${clinikoTimezone}, falling back to UTC`);
+      return 'UTC';
+    }
+    
+    return mapped;
   }
 
   private async findAppointmentTypeByName(serviceName: string): Promise<{ id: string; name: string; duration: number } | null> {

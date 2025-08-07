@@ -1,5 +1,38 @@
 import { AppointmentData, BookingResponse } from '../../../shared/types';
 
+// Additional types needed by other components
+export interface BookingResult {
+  success: boolean;
+  message: string;
+  appointmentId?: string;
+  details?: any;
+}
+
+export interface AvailabilityResult {
+  available: boolean;
+  slots: AvailableSlot[];
+  message?: string;
+}
+
+export interface AppointmentInfo {
+  id: string;
+  patientName: string;
+  serviceType: string;
+  practitionerName: string;
+  dateTime: Date;
+  duration: number;
+  status: string;
+}
+
+export interface PatientInfo {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+}
+
 export interface AvailableSlot {
   startTime: Date;
   endTime: Date;
@@ -125,7 +158,8 @@ export abstract class BaseBookingAdapter {
   abstract searchExistingPatient(
     patientName: string,
     patientPhone?: string,
-    patientEmail?: string
+    patientEmail?: string,
+    dateOfBirth?: string
   ): Promise<any | null>;
 
   /**
@@ -137,7 +171,7 @@ export abstract class BaseBookingAdapter {
   ): Promise<any | null>;
 
   /**
-   * Search for a patient by name and phone number (for cancellation flow)
+   * Search for a patient by name and phone number (for cancellation flow) - DEPRECATED: Use searchPatientByNameAndDOB instead
    */
   abstract searchPatientByNameAndPhone(
     patientName: string,

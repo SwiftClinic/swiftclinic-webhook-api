@@ -1,7 +1,7 @@
 // Load environment variables first
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import express from 'express';
 import cors from 'cors';
@@ -148,8 +148,8 @@ class WebhookAPIServer {
           },
           fallback: {
             active: systemHealth.fallbackActive,
-            mockBookingEnabled: fallbackConfig.booking.enableMockBooking,
-            offlineLLMEnabled: fallbackConfig.llm.enableOfflineMode
+            mockBookingEnabled: fallbackConfig.enableMockFallback,
+            offlineLLMEnabled: false
           },
           timestamp: new Date()
         });
@@ -1298,27 +1298,38 @@ class WebhookAPIServer {
 
     try {
       console.log(`[DEBUG] Loading clinic for webhook: ${webhookId}`);
-      const clinicConfig = await this.database.getClinicByWebhook(webhookId);
-      if (!clinicConfig) {
-        console.log(`[DEBUG] No clinic found for webhook ID: ${webhookId}, using fallback config`);
-        
-        // Use fallback manager to create clinic configuration
-        const scenario = this.fallbackManager.handleFallbackScenario('clinic_not_found', { webhookId });
-        const fallbackConfig = this.fallbackManager.createFallbackClinicConfig(webhookId);
-        
-        console.log(`🔄 [DEBUG] ${scenario.systemMessage}`);
-        return fallbackConfig;
-      }
       
-      console.log(`[DEBUG] Found clinic: ${clinicConfig.name} (ID: ${clinicConfig.id})`);
+      // TEMPORARY FIX: Skip database query that hangs, use fallback directly
+      console.log(`[DEBUG] 🚀 BYPASS MODE: Skipping database query, using fallback config directly`);
+      const scenario = this.fallbackManager.handleFallbackScenario('clinic_not_found', { webhookId });
+      const fallbackConfig = this.fallbackManager.createFallbackClinicConfig(webhookId);
       
-      // Cache the result
-      this.clinicConfigCache.set(webhookId, { 
-        config: clinicConfig, 
-        cachedAt: Date.now() 
-      });
+      console.log(`🔄 [DEBUG] ${scenario.customMessages?.error || 'Using fallback config (database bypassed)'}`);
+      return fallbackConfig;
       
-      return clinicConfig;
+      // COMMENTED OUT: Hanging database query
+      // const clinicConfig = await this.database.getClinicByWebhook(webhookId);
+      // if (!clinicConfig) {
+      //   console.log(`[DEBUG] No clinic found for webhook ID: ${webhookId}, using fallback config`);
+      //   
+      //   // Use fallback manager to create clinic configuration
+      //   const scenario = this.fallbackManager.handleFallbackScenario('clinic_not_found', { webhookId });
+      //   const fallbackConfig = this.fallbackManager.createFallbackClinicConfig(webhookId);
+      //   
+      //   console.log(`🔄 [DEBUG] ${scenario.customMessages?.error || 'Clinic not found, using fallback'}`);
+      //   return fallbackConfig;
+      // }
+      
+      // COMMENTED OUT: Unreachable code after bypass
+      // console.log(`[DEBUG] Found clinic: ${clinicConfig.name} (ID: ${clinicConfig.id})`);
+      // 
+      // // Cache the result
+      // this.clinicConfigCache.set(webhookId, { 
+      //   config: clinicConfig, 
+      //   cachedAt: Date.now() 
+      // });
+      // 
+      // return clinicConfig;
     } catch (error) {
       console.error(`[DEBUG] Error loading clinic:`, error);
       
