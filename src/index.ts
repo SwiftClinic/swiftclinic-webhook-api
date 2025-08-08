@@ -1404,8 +1404,7 @@ class WebhookAPIServer {
   }
 
   async start(port: number = 3002): Promise<void> {
-    await this.initialize();
-
+    // Start HTTP server first so health endpoints are reachable even if init fails
     this.server = createServer(this.app);
 
     // Graceful shutdown
@@ -1414,9 +1413,13 @@ class WebhookAPIServer {
 
     this.server.listen(port, '0.0.0.0', () => {
       console.log(`🤖 Webhook API server running on port ${port}`);
-      console.log(`🧠 LLM brain active and ready`);
-      console.log(`🔗 Cliniko adapter ready`);
       console.log(`🔒 Security and rate limiting enabled`);
+
+      // Initialize asynchronously; don't block server readiness
+      this.initialize().catch((err) => {
+        console.error('⚠️ Failed to fully initialize on startup. Running in fallback mode:', err);
+        // Keep server alive; healthz remains 200, readyz stays 503
+      });
     });
   }
 
