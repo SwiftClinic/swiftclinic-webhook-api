@@ -966,6 +966,57 @@ class WebhookAPIServer {
     // Main webhook endpoint
     this.app.post('/webhook/:webhookId', this.handleWebhookMessage.bind(this));
 
+    // Register clinic configuration (production: persists encrypted Cliniko creds)
+    this.app.post('/register-clinic', async (req, res) => {
+      try {
+        const { uniqueWebhookId, clinicId, clinicName, apiConfiguration } = req.body || {};
+        if (!uniqueWebhookId || !apiConfiguration?.clinikApiKey || !apiConfiguration?.shard) {
+          return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        const config: Omit<ClinicConfig, 'id' | 'webhookUrl' | 'createdAt' | 'updatedAt'> = {
+          name: clinicName || 'Clinic',
+          contactInfo: { email: '', phone: '', address: '' },
+          businessHours: {},
+          services: [],
+          bookingSystem: 'cliniko' as BookingSystemType,
+          apiCredentials: {
+            // Store as plain JSON initially; EncryptionService can be enabled later
+            data: JSON.stringify({
+              apiKey: apiConfiguration.clinikApiKey,
+              shard: apiConfiguration.shard,
+              businessId: apiConfiguration.businessId || ''
+            }),
+            iv: '',
+            tag: ''
+          },
+          knowledgeBase: undefined,
+          gdprSettings: { dataRetentionDays: 90, allowDataProcessing: true, cookieConsent: true },
+          webhookUrl: '', // filled by database createClinic
+          timezone: apiConfiguration.timezone || 'UTC',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        } as any;
+
+        // Create or upsert clinic and override webhook URL to the provided UUID
+        const created = await this.database.createClinic(config);
+        // Overwrite the webhook url to match the UUID so lookups succeed
+        (created as any).webhookUrl = uniqueWebhookId;
+        // Directly update row to set webhook_url to UUID
+        await (this.database as any).db?.run('UPDATE clinics SET webhook_url = ? WHERE id = ?', [uniqueWebhookId, created.id]);
+
+        // Bust caches
+        this.clinicConfigCache.delete(uniqueWebhookId);
+        this.clinicAdapterCache.delete(uniqueWebhookId);
+
+        return res.json({ success: true, data: { webhookId: uniqueWebhookId } });
+      } catch (err: any) {
+        console.error('register-clinic error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to register clinic' });
+      }
+    });
+
     // Testing endpoint for specific clinic
     this.app.post('/test/:webhookId', this.testConnection.bind(this));
 
@@ -1308,38 +1359,14 @@ class WebhookAPIServer {
 
     try {
       console.log(`[DEBUG] Loading clinic for webhook: ${webhookId}`);
-      
-      // TEMPORARY FIX: Skip database query that hangs, use fallback directly
-      console.log(`[DEBUG] 🚀 BYPASS MODE: Skipping database query, using fallback config directly`);
-      const scenario = this.fallbackManager.handleFallbackScenario('clinic_not_found', { webhookId });
-      const fallbackConfig = this.fallbackManager.createFallbackClinicConfig(webhookId);
-      
-      console.log(`🔄 [DEBUG] ${scenario.customMessages?.error || 'Using fallback config (database bypassed)'}`);
-      return fallbackConfig;
-      
-      // COMMENTED OUT: Hanging database query
-      // const clinicConfig = await this.database.getClinicByWebhook(webhookId);
-      // if (!clinicConfig) {
-      //   console.log(`[DEBUG] No clinic found for webhook ID: ${webhookId}, using fallback config`);
-      //   
-      //   // Use fallback manager to create clinic configuration
-      //   const scenario = this.fallbackManager.handleFallbackScenario('clinic_not_found', { webhookId });
-      //   const fallbackConfig = this.fallbackManager.createFallbackClinicConfig(webhookId);
-      //   
-      //   console.log(`🔄 [DEBUG] ${scenario.customMessages?.error || 'Clinic not found, using fallback'}`);
-      //   return fallbackConfig;
-      // }
-      
-      // COMMENTED OUT: Unreachable code after bypass
-      // console.log(`[DEBUG] Found clinic: ${clinicConfig.name} (ID: ${clinicConfig.id})`);
-      // 
-      // // Cache the result
-      // this.clinicConfigCache.set(webhookId, { 
-      //   config: clinicConfig, 
-      //   cachedAt: Date.now() 
-      // });
-      // 
-      // return clinicConfig;
+      const clinicConfig = await this.database.getClinicByWebhook(webhookId);
+      if (!clinicConfig) {
+        throw new Error('Clinic configuration not found');
+      }
+
+      // Cache and return
+      this.clinicConfigCache.set(webhookId, { config: clinicConfig, cachedAt: Date.now() });
+      return clinicConfig;
     } catch (error) {
       console.error(`[DEBUG] Error loading clinic:`, error);
       
