@@ -162,4 +162,4 @@ export class DataAnonymizer {
   static generateAnonymousSessionId(): string {
     return crypto.randomUUID();
   }
-}
+} 

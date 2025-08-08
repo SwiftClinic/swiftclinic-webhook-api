@@ -151,4 +151,4 @@ export type BookingSystemType =
   | 'acuity' 
   | 'simple-practice' 
   | 'square-appointments' 
-  | 'custom';
+  | 'custom'; 
