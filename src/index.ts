@@ -985,14 +985,17 @@ class WebhookAPIServer {
         }
 
         // Upsert by UUID webhook id
+        // Encrypt credentials before storage
+        const encrypted = this.encryptionService.encrypt(JSON.stringify({
+          apiKey: apiConfiguration.clinikApiKey,
+          shard: apiConfiguration.shard,
+          businessId: apiConfiguration.businessId || ''
+        }));
+
         const stored = await (this.database as any).upsertClinicByWebhookId({
           webhookId: uniqueWebhookId,
           clinicName: clinicName || 'Clinic',
-          apiCredentials: {
-            apiKey: apiConfiguration.clinikApiKey,
-            shard: apiConfiguration.shard,
-            businessId: apiConfiguration.businessId || ''
-          },
+          apiCredentials: encrypted,
           timezone: apiConfiguration.timezone || 'UTC',
           services: [],
           businessHours: {},

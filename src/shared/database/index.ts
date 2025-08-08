@@ -245,6 +245,8 @@ export class SecureDatabase {
     // For testing: store credentials as plain JSON (not encrypted)
     const credentialsJson = JSON.stringify(config.apiCredentials);
 
+    const encrypted = this.encryptionService.encrypt(JSON.stringify(config.apiCredentials));
+
     const clinic: ClinicConfig = {
       ...config,
       id,
@@ -268,7 +270,7 @@ export class SecureDatabase {
       JSON.stringify(clinic.businessHours),
       JSON.stringify(clinic.services),
       clinic.bookingSystem,
-      credentialsJson,  // Store as plain JSON for testing
+      JSON.stringify(encrypted),
       clinic.webhookUrl,
       clinic.timezone || 'UTC', // Store timezone from business API
       JSON.stringify(clinic.gdprSettings),
@@ -299,8 +301,23 @@ export class SecureDatabase {
     console.log(`[DB DEBUG] Found clinic: ${row.name} (ID: ${row.id})`);
 
     try {
-      // For testing: read credentials as plain JSON (not encrypted)
-      const apiCredentials = JSON.parse(row.encrypted_credentials);
+      let apiCredentials: any;
+      const stored = JSON.parse(row.encrypted_credentials || '{}');
+      if (stored && stored.data && stored.iv && stored.tag) {
+        // Encrypted form
+        const decrypted = this.encryptionService.decrypt(stored);
+        apiCredentials = JSON.parse(decrypted);
+      } else {
+        // Legacy plaintext form; migrate to encrypted in-place
+        apiCredentials = stored;
+        try {
+          const encrypted = this.encryptionService.encrypt(JSON.stringify(apiCredentials));
+          await this.db!.run(`UPDATE clinics SET encrypted_credentials = ? WHERE id = ?`, [JSON.stringify(encrypted), row.id]);
+          console.log('[DB] Migrated plaintext credentials to encrypted for clinic', row.id);
+        } catch (e) {
+          console.warn('[DB] Failed to auto-migrate credentials to encrypted:', e);
+        }
+      }
       console.log(`[DB DEBUG] Loaded credentials for shard: ${apiCredentials.shard}`);
 
       return {
@@ -314,7 +331,7 @@ export class SecureDatabase {
         businessHours: JSON.parse(row.business_hours),
         services: JSON.parse(row.services),
         bookingSystem: row.booking_system,
-        apiCredentials: apiCredentials, // Use the correct variable name
+        apiCredentials: apiCredentials,
         knowledgeBase: await this.getKnowledgeBase(row.id),
         webhookUrl: row.webhook_url,
         timezone: row.timezone || 'UTC', // Load timezone from database
@@ -342,8 +359,19 @@ export class SecureDatabase {
     const clinics: ClinicConfig[] = [];
     
     for (const row of rows) {
-      // For testing: read credentials as plain JSON (not encrypted)
-      const apiCredentials = JSON.parse(row.encrypted_credentials);
+      // Decrypt or parse legacy credentials
+      let apiCredentials: any;
+      try {
+        const stored = JSON.parse(row.encrypted_credentials || '{}');
+        if (stored && stored.data && stored.iv && stored.tag) {
+          const decrypted = this.encryptionService.decrypt(stored);
+          apiCredentials = JSON.parse(decrypted);
+        } else {
+          apiCredentials = stored;
+        }
+      } catch {
+        apiCredentials = {};
+      }
 
       clinics.push({
         id: row.id,
@@ -356,7 +384,7 @@ export class SecureDatabase {
         businessHours: JSON.parse(row.business_hours),
         services: JSON.parse(row.services),
         bookingSystem: row.booking_system,
-        apiCredentials: apiCredentials, // Use plain JSON for testing
+        apiCredentials: apiCredentials,
         knowledgeBase: await this.getKnowledgeBase(row.id),
         webhookUrl: row.webhook_url,
         timezone: row.timezone || 'UTC', // Load timezone from database
