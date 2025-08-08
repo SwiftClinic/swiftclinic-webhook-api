@@ -967,7 +967,17 @@ class WebhookAPIServer {
     this.app.post('/webhook/:webhookId', this.handleWebhookMessage.bind(this));
 
     // Register clinic configuration (production: persists encrypted Cliniko creds)
+    // Require admin bearer token for registration
     this.app.post('/register-clinic', async (req, res) => {
+      try {
+        const auth = req.header('authorization') || '';
+        const expected = process.env.ADMIN_BEARER_TOKEN;
+        if (!expected || !auth.startsWith('Bearer ') || auth.replace('Bearer ', '') !== expected) {
+          return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+      } catch (e) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
       try {
         const { uniqueWebhookId, clinicId, clinicName, apiConfiguration } = req.body || {};
         if (!uniqueWebhookId || !apiConfiguration?.clinikApiKey || !apiConfiguration?.shard) {
