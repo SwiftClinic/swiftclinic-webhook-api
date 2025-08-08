@@ -42,6 +42,9 @@ export interface EncryptedCredentials {
   data: string;
   iv: string;
   tag: string;
+  // Added for forward security: per-record salt used to derive key
+  // Optional for backward compatibility with older records
+  salt?: string;
   // For Cliniko specifically, we'll store:
   // { apiKey: string, shard: string, businessId: string }
   // For other systems, different fields as needed

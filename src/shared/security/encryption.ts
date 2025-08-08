@@ -9,13 +9,15 @@ export class EncryptionService {
   private static readonly SALT_LENGTH = 32; // 256 bits
 
   private masterKey: Buffer;
+  private saltHex: string;
 
   constructor(masterPassword: string, salt?: string) {
     const saltBuffer = salt ? Buffer.from(salt, 'hex') : crypto.randomBytes(EncryptionService.SALT_LENGTH);
+    this.saltHex = salt ? salt : saltBuffer.toString('hex');
     this.masterKey = crypto.pbkdf2Sync(
       masterPassword,
       saltBuffer,
-      100000, // iterations
+      100000,
       EncryptionService.KEY_LENGTH,
       'sha512'
     );
@@ -39,7 +41,8 @@ export class EncryptionService {
       return {
         data: encrypted,
         iv: iv.toString('base64'),
-        tag: authTag.toString('base64')
+        tag: authTag.toString('base64'),
+        salt: this.saltHex
       };
     } catch (error) {
       throw new Error(`Encryption failed: ${error}`);
@@ -51,6 +54,18 @@ export class EncryptionService {
    */
   decrypt(encryptedData: EncryptedCredentials): string {
     try {
+      // If the record carries its own salt, derive a key using that salt to avoid MASTER_PASSWORD salt drift issues
+      if (encryptedData.salt) {
+        const derived = crypto.pbkdf2Sync(
+          process.env.MASTER_PASSWORD || '',
+          Buffer.from(encryptedData.salt, 'hex'),
+          100000,
+          EncryptionService.KEY_LENGTH,
+          'sha512'
+        );
+        this.masterKey = derived;
+        this.saltHex = encryptedData.salt;
+      }
       const iv = Buffer.from(encryptedData.iv, 'base64');
       const authTag = Buffer.from(encryptedData.tag, 'base64');
       const decipher = crypto.createDecipheriv(EncryptionService.ALGORITHM, this.masterKey, iv);

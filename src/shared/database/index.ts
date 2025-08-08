@@ -304,7 +304,7 @@ export class SecureDatabase {
       let apiCredentials: any;
       const stored = JSON.parse(row.encrypted_credentials || '{}');
       if (stored && stored.data && stored.iv && stored.tag) {
-        // Encrypted form
+        // Encrypted form; try record's own salt if present
         const decrypted = this.encryptionService.decrypt(stored);
         apiCredentials = JSON.parse(decrypted);
       } else {
