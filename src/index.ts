@@ -1016,6 +1016,49 @@ class WebhookAPIServer {
       }
     });
 
+    // Admin Cliniko detection (secured)
+    this.app.post('/admin/cliniko/detect', async (req, res) => {
+      try {
+        const auth = req.header('authorization') || '';
+        const expected = process.env.ADMIN_BEARER_TOKEN;
+        if (!expected || !auth.startsWith('Bearer ') || auth.replace('Bearer ', '') !== expected) {
+          return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        const { clinikApiKey, shard } = req.body || {};
+        if (!clinikApiKey) {
+          return res.status(400).json({ success: false, error: 'Missing Cliniko API key' });
+        }
+
+        const shardsToTry = shard ? [shard] : ['uk2', 'us1', 'au1', 'ca1'];
+        const axios = (await import('axios')).default;
+
+        for (const s of shardsToTry) {
+          try {
+            const baseUrl = `https://api.${s}.cliniko.com/v1`;
+            const response = await axios.get(`${baseUrl}/businesses`, {
+              auth: { username: clinikApiKey, password: '' },
+              timeout: 15000
+            });
+            const businesses = (response.data?.businesses || []).map((b: any) => ({
+              id: String(b.id),
+              name: b.name,
+              time_zone: b.time_zone,
+              raw: b
+            }));
+            return res.json({ success: true, data: { shard: s, businesses } });
+          } catch (err: any) {
+            // try next shard
+          }
+        }
+
+        return res.status(400).json({ success: false, error: 'Could not detect shard or fetch businesses with provided API key' });
+      } catch (error) {
+        console.error('cliniko/detect error:', error);
+        return res.status(500).json({ success: false, error: 'Detection failed' });
+      }
+    });
+
     // Testing endpoint for specific clinic
     this.app.post('/test/:webhookId', this.testConnection.bind(this));
 
