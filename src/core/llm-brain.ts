@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 import moment from 'moment-timezone';
-import { SecureDatabase } from '../../../shared/database';
-import { ClinicConfig } from '../../../shared/types';
+import { SecureDatabase } from '../shared/database';
+import { ClinicConfig } from '../shared/types';
 import { BaseBookingAdapter } from '../booking-adapters/base-booking-adapter';
 import { ConversationManager } from './conversation-manager';
-import { EncryptionService } from '../../../shared/security/encryption';
+import { EncryptionService } from '../shared/security/encryption';
 import { BookingAdapterFactory } from '../booking-adapters/adapter-factory';
 import { IntelligentContextManager, ConversationOffer, UserReference } from './intelligent-context-manager';
 

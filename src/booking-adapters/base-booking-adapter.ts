@@ -1,4 +1,4 @@
-import { AppointmentData, BookingResponse } from '../../../shared/types';
+import { AppointmentData, BookingResponse } from '../shared/types';
 
 // Additional types needed by other components
 export interface BookingResult {

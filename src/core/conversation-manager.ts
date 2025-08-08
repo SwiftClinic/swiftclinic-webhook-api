@@ -1,6 +1,6 @@
-import { ChatMessage, ConversationLog } from '../../../shared/types';
-import { SecureDatabase } from '../../../shared/database';
-import { DataAnonymizer } from '../../../shared/security/encryption';
+import { ChatMessage, ConversationLog } from '../shared/types';
+import { SecureDatabase } from '../shared/database';
+import { DataAnonymizer } from '../shared/security/encryption';
 import moment from 'moment-timezone';
 
 interface UserInformation {

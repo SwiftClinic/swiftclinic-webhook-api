@@ -1,4 +1,4 @@
-import { ChatMessage } from '../../../shared/types';
+import { ChatMessage } from '../shared/types';
 import moment from 'moment-timezone';
 
 /**

@@ -1,4 +1,4 @@
-import { ClinicConfig, BookingSystemType } from '../../../shared/types';
+import { ClinicConfig, BookingSystemType } from '../shared/types';
 import { BaseBookingAdapter, BookingSystemCredentials } from './base-booking-adapter';
 import { ClinikoAdapter } from './cliniko-adapter';
 import { MockBookingAdapter, MockBookingOptions } from './mock-adapter';

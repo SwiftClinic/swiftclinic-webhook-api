@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import moment from 'moment-timezone';
-import { AppointmentData, BookingResponse } from '../../../shared/types';
+import { AppointmentData, BookingResponse } from '../shared/types';
 import { 
   BaseBookingAdapter, 
   AvailableSlot, 
