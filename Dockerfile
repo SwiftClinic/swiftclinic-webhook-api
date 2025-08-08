@@ -1,19 +1,34 @@
 # Runtime Dockerfile using tsx (no TypeScript compile step)
-FROM node:20-alpine
+############################################
+# Build stage: compile TypeScript to JS
+############################################
+FROM node:20-slim AS build
 WORKDIR /app
 
-# Install deps only
+# Install all deps (incl. dev) for compilation
 COPY package*.json ./
-RUN npm install --no-audit --no-fund && npm install -D tsx
+RUN npm install --no-audit --no-fund
 
-# Copy application source explicitly
+# Copy sources and compile
 COPY tsconfig.json ./
 COPY src ./src
 COPY shared ./shared
+RUN npm run build
 
+# Prune dev deps for a lean runtime
+RUN npm prune --omit=dev
+
+############################################
+# Runtime stage: run compiled JS only
+############################################
+FROM node:20-slim AS runtime
+WORKDIR /app
 ENV NODE_ENV=production
 ENV WEBHOOK_PORT=3002
-EXPOSE 3002
 
-# Run TypeScript directly via tsx (no build step)
-CMD ["npx","tsx","src/index.ts"]
+# Copy production node_modules and compiled dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+
+EXPOSE 3002
+CMD ["node","dist/src/index.js"]
