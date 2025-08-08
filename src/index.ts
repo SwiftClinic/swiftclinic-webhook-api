@@ -1445,7 +1445,8 @@ declare global {
 // Start the server if this file is run directly
 if (require.main === module) {
   const server = new WebhookAPIServer();
-  const port = parseInt(process.env.WEBHOOK_PORT || '3002', 10);
+  // Prefer platform-provided PORT, then fallback to WEBHOOK_PORT, then default
+  const port = parseInt(process.env.PORT || process.env.WEBHOOK_PORT || '3002', 10);
   
   server.start(port).catch((error) => {
     console.error('Failed to start webhook API server:', error);
