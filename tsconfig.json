@@ -22,6 +22,11 @@
     "allowSyntheticDefaultImports": true,
     
   },
-  "include": ["src/**/*", "shared/**/*"],
+  "include": [
+    "src/**/*",
+    "shared/database/**/*",
+    "shared/security/**/*",
+    "shared/types/**/*"
+  ],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

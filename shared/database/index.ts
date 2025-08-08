@@ -281,7 +281,7 @@ export class SecureDatabase {
     if (!this.db) throw new Error('Database not initialized');
 
     // Check if messages contain PII
-    const containsPII = log.messages.some(msg => DataAnonymizer.containsPII(msg.content));
+    const containsPII = log.messages.some(msg => (DataAnonymizer as any).containsPII(msg.content));
 
     await this.db.run(`
       INSERT INTO conversation_logs (
@@ -342,7 +342,7 @@ export class SecureDatabase {
     if (!this.db) throw new Error('Database not initialized');
 
     // Check if messages contain PII
-    const containsPII = log.messages.some(msg => DataAnonymizer.containsPII(msg.content));
+    const containsPII = log.messages.some(msg => (DataAnonymizer as any).containsPII(msg.content));
 
     await this.db.run(`
       INSERT OR REPLACE INTO conversation_logs (
@@ -390,7 +390,7 @@ export class SecureDatabase {
       const messages = JSON.parse(row.messages);
       const anonymizedMessages = messages.map((msg: any) => ({
         ...msg,
-        content: DataAnonymizer.anonymizeText(msg.content),
+        content: (DataAnonymizer as any).anonymizeText(msg.content),
         containsPII: false
       }));
 
