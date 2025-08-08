@@ -12,9 +12,9 @@ import morgan from 'morgan';
 import { body, param } from 'express-validator';
 import { createServer } from 'http';
 
-import { SecureDatabase } from '../../shared/database';
-import { EncryptionService } from '../../shared/security/encryption';
-import { ClinicConfig, WebhookPayload, APIResponse, BookingSystemType } from '../../shared/types';
+import { SecureDatabase } from '../shared/database';
+import { EncryptionService } from '../shared/security/encryption';
+import { ClinicConfig, WebhookPayload, APIResponse, BookingSystemType } from '../shared/types';
 import { LLMBrain, ChatRequest, LLMResponse, FunctionCall } from './core/llm-brain';
 import { BookingAdapterFactory } from './booking-adapters/adapter-factory';
 import { BaseBookingAdapter } from './booking-adapters/base-booking-adapter';
