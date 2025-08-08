@@ -49,6 +49,7 @@ class WebhookAPIServer {
   private fallbackManager!: FallbackManager; // Will be initialized in initialize()
   private clinicAdapterCache: Map<string, { config: ClinicConfig; adapter: BaseBookingAdapter; cachedAt: number }> = new Map();
   private clinicConfigCache: Map<string, { config: ClinicConfig; cachedAt: number }> = new Map();
+  private isReady: boolean = false;
 
   constructor() {
     this.app = express();
@@ -127,6 +128,15 @@ class WebhookAPIServer {
   }
 
   private setupRoutes(): void {
+    // Lightweight health endpoints that never block on external services
+    this.app.get('/', (req, res) => res.status(200).json({ status: 'ok' }));
+    this.app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }));
+    this.app.get('/readyz', (req, res) => {
+      if (this.isReady) {
+        return res.status(200).json({ ready: true });
+      }
+      return res.status(503).json({ ready: false });
+    });
     // Health check endpoint
     this.app.get('/health', (req, res) => {
       res.json({ status: 'healthy', timestamp: new Date() });
@@ -1385,6 +1395,7 @@ class WebhookAPIServer {
       this.encryptionService = new EncryptionService(masterPassword);
 
       console.log('Webhook API initialized successfully');
+      this.isReady = true;
 
     } catch (error) {
       console.error('Failed to initialize webhook API server:', error);
@@ -1401,7 +1412,7 @@ class WebhookAPIServer {
     process.on('SIGTERM', () => this.gracefulShutdown());
     process.on('SIGINT', () => this.gracefulShutdown());
 
-    this.server.listen(port, () => {
+    this.server.listen(port, '0.0.0.0', () => {
       console.log(`🤖 Webhook API server running on port ${port}`);
       console.log(`🧠 LLM brain active and ready`);
       console.log(`🔗 Cliniko adapter ready`);
