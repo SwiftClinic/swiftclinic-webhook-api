@@ -1,13 +1,21 @@
-# Minimal Dockerfile to bypass Nixpacks/npm ci and run from compiled dist
+# Build inside Docker from source (no npm ci)
 FROM node:20-alpine
 WORKDIR /app
-# Only install production deps
+
+# Install deps
 COPY package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund
-# Copy compiled output only (we run from dist)
-COPY dist ./dist
+RUN npm install --no-audit --no-fund
+
+# Copy sources and config
+COPY tsconfig.json ./
+COPY src ./src
+COPY shared ./shared
+
 ENV NODE_ENV=production
-# Railway will pass PORT env; default to 3002 locally
 ENV WEBHOOK_PORT=3002
+
+# Build TypeScript
+RUN npm run build
+
 EXPOSE 3002
-CMD ["node","dist/webhook-api/src/index.js"]
+CMD ["node","dist/src/index.js"]
