@@ -7,7 +7,8 @@ WORKDIR /app
 
 # Install deps (incl. dev) so tsx is available at runtime
 COPY package*.json ./
-RUN npm install --no-audit --no-fund
+# Install deps; explicitly ensure tsx is present even if production installs are used by the builder
+RUN npm install --no-audit --no-fund && npm install tsx@^4.6.2 --no-audit --no-fund
 
 # Copy sources and tsconfig (tsx reads tsconfig for path/ts features)
 COPY tsconfig.json ./
