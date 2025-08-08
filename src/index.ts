@@ -974,43 +974,29 @@ class WebhookAPIServer {
           return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
 
-        const config: Omit<ClinicConfig, 'id' | 'webhookUrl' | 'createdAt' | 'updatedAt'> = {
-          name: clinicName || 'Clinic',
-          contactInfo: { email: '', phone: '', address: '' },
-          businessHours: {},
-          services: [],
-          bookingSystem: 'cliniko' as BookingSystemType,
+        // Upsert by UUID webhook id
+        const stored = await (this.database as any).upsertClinicByWebhookId({
+          webhookId: uniqueWebhookId,
+          clinicName: clinicName || 'Clinic',
           apiCredentials: {
-            // Store as plain JSON initially; EncryptionService can be enabled later
-            data: JSON.stringify({
-              apiKey: apiConfiguration.clinikApiKey,
-              shard: apiConfiguration.shard,
-              businessId: apiConfiguration.businessId || ''
-            }),
-            iv: '',
-            tag: ''
+            apiKey: apiConfiguration.clinikApiKey,
+            shard: apiConfiguration.shard,
+            businessId: apiConfiguration.businessId || ''
           },
-          knowledgeBase: undefined,
-          gdprSettings: { dataRetentionDays: 90, allowDataProcessing: true, cookieConsent: true },
-          webhookUrl: '', // filled by database createClinic
           timezone: apiConfiguration.timezone || 'UTC',
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } as any;
-
-        // Create or upsert clinic and override webhook URL to the provided UUID
-        const created = await this.database.createClinic(config);
-        // Overwrite the webhook url to match the UUID so lookups succeed
-        (created as any).webhookUrl = uniqueWebhookId;
-        // Directly update row to set webhook_url to UUID
-        await (this.database as any).db?.run('UPDATE clinics SET webhook_url = ? WHERE id = ?', [uniqueWebhookId, created.id]);
+          services: [],
+          businessHours: {},
+          contactInfo: {},
+          bookingSystem: 'cliniko',
+          gdprSettings: { dataRetentionDays: 90, allowDataProcessing: true, cookieConsent: true },
+          isActive: true
+        });
 
         // Bust caches
         this.clinicConfigCache.delete(uniqueWebhookId);
         this.clinicAdapterCache.delete(uniqueWebhookId);
 
-        return res.json({ success: true, data: { webhookId: uniqueWebhookId } });
+        return res.json({ success: true, message: 'Clinic configuration registered successfully', data: { webhookId: uniqueWebhookId } });
       } catch (err: any) {
         console.error('register-clinic error:', err);
         return res.status(500).json({ success: false, error: 'Failed to register clinic' });

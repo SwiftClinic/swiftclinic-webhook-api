@@ -31,8 +31,10 @@ export class FallbackManager {
   private healthStatus: SystemHealthStatus;
 
   constructor(config: Partial<FallbackConfig> = {}) {
+    const prod = process.env.NODE_ENV === 'production';
     this.config = {
-      enableMockFallback: config.enableMockFallback ?? true,
+      // In production, disable mock fallback by default so issues surface
+      enableMockFallback: config.enableMockFallback ?? !prod,
       enableSystemHealth: config.enableSystemHealth ?? true,
       healthCheckInterval: config.healthCheckInterval ?? 60000, // 1 minute
       maxRetries: config.maxRetries ?? 3,

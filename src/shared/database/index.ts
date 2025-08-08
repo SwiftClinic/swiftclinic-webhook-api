@@ -13,6 +13,102 @@ export class SecureDatabase {
   }
 
   /**
+   * Upsert a clinic configuration by a fixed webhook UUID so lookups work immediately
+   * Stores credentials as JSON (encrypted-at-rest can be enabled later via EncryptionService)
+   */
+  async upsertClinicByWebhookId(params: {
+    webhookId: string;
+    clinicName: string;
+    apiCredentials: any; // raw object; will be JSON stringified for storage
+    timezone?: string;
+    services?: string[];
+    businessHours?: any;
+    contactInfo?: { email?: string; phone?: string; address?: string };
+    bookingSystem?: string;
+    gdprSettings?: GDPRSettings;
+    isActive?: boolean;
+  }): Promise<ClinicConfig> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const {
+      webhookId,
+      clinicName,
+      apiCredentials,
+      timezone = 'UTC',
+      services = [],
+      businessHours = {},
+      contactInfo = {},
+      bookingSystem = 'cliniko',
+      gdprSettings = { dataRetentionDays: 90, allowDataProcessing: true, cookieConsent: true },
+      isActive = true
+    } = params;
+
+    const id = EncryptionService.generateSecureToken(16);
+    const credentialsJson = JSON.stringify(apiCredentials);
+
+    // Use SQLite UPSERT to insert or update by webhook_url uniqueness
+    await this.db.run(
+      `INSERT INTO clinics (
+         id, name, contact_email, contact_phone, contact_address,
+         business_hours, services, booking_system, encrypted_credentials,
+         webhook_url, timezone, gdpr_settings, is_active
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(webhook_url) DO UPDATE SET
+         name = excluded.name,
+         contact_email = excluded.contact_email,
+         contact_phone = excluded.contact_phone,
+         contact_address = excluded.contact_address,
+         business_hours = excluded.business_hours,
+         services = excluded.services,
+         booking_system = excluded.booking_system,
+         encrypted_credentials = excluded.encrypted_credentials,
+         timezone = excluded.timezone,
+         gdpr_settings = excluded.gdpr_settings,
+         is_active = excluded.is_active
+      `,
+      [
+        id,
+        clinicName,
+        contactInfo.email || '',
+        contactInfo.phone || '',
+        contactInfo.address || '',
+        JSON.stringify(businessHours),
+        JSON.stringify(services),
+        bookingSystem,
+        credentialsJson,
+        webhookId,
+        timezone,
+        JSON.stringify(gdprSettings),
+        isActive ? 1 : 0
+      ]
+    );
+
+    // Read back the row to build ClinicConfig
+    const row = await this.db.get(`SELECT * FROM clinics WHERE webhook_url = ?`, [webhookId]);
+
+    return {
+      id: row.id,
+      name: row.name,
+      contactInfo: {
+        email: row.contact_email,
+        phone: row.contact_phone,
+        address: row.contact_address
+      },
+      businessHours: JSON.parse(row.business_hours || '{}'),
+      services: JSON.parse(row.services || '[]'),
+      bookingSystem: row.booking_system,
+      apiCredentials: JSON.parse(row.encrypted_credentials),
+      knowledgeBase: await this.getKnowledgeBase(row.id),
+      webhookUrl: row.webhook_url,
+      timezone: row.timezone || 'UTC',
+      gdprSettings: JSON.parse(row.gdpr_settings || '{}'),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      isActive: Boolean(row.is_active)
+    } as ClinicConfig;
+  }
+
+  /**
    * Initialize database with GDPR-compliant schema
    */
   async initialize(): Promise<void> {
