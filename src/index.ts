@@ -966,16 +966,58 @@ class WebhookAPIServer {
     // Main webhook endpoint
     this.app.post('/webhook/:webhookId', this.handleWebhookMessage.bind(this));
 
-    // Register clinic configuration (production: persists encrypted Cliniko creds)
-    // Require admin bearer token for registration
-    this.app.post('/register-clinic', async (req, res) => {
+    // Helper: admin auth via JWT or bearer token
+    const requireAdminAuth = (req: express.Request, res: express.Response): boolean => {
       try {
         const auth = req.header('authorization') || '';
-        const expected = process.env.ADMIN_BEARER_TOKEN;
-        if (!expected || !auth.startsWith('Bearer ') || auth.replace('Bearer ', '') !== expected) {
-          return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const bearer = process.env.ADMIN_BEARER_TOKEN;
+        const jwtSecret = process.env.ADMIN_JWT_SECRET || '';
+        if (auth.startsWith('Bearer ')) {
+          const token = auth.replace('Bearer ', '');
+          if (bearer && token === bearer) return true;
+          if (jwtSecret) {
+            try {
+              const jwt = require('jsonwebtoken');
+              jwt.verify(token, jwtSecret);
+              return true;
+            } catch (_) {}
+          }
         }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    // Admin login -> JWT
+    this.app.post('/admin/login', async (req, res) => {
+      try {
+        const { email, password } = req.body || {};
+        const adminEmail = process.env.ADMIN_EMAIL || '';
+        const passwordHash = process.env.ADMIN_PASSWORD_HASH || '';
+        const jwtSecret = process.env.ADMIN_JWT_SECRET || '';
+        if (!adminEmail || !passwordHash || !jwtSecret) {
+          return res.status(500).json({ success: false, error: 'Admin auth not configured' });
+        }
+        if (email !== adminEmail) {
+          return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+        const bcrypt = require('bcrypt');
+        const ok = await bcrypt.compare(password || '', passwordHash);
+        if (!ok) {
+          return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign({ sub: adminEmail, role: 'admin' }, jwtSecret, { expiresIn: '8h' });
+        return res.json({ success: true, data: { token } });
       } catch (e) {
+        return res.status(500).json({ success: false, error: 'Login failed' });
+      }
+    });
+
+    // Register clinic configuration (production: persists encrypted Cliniko creds)
+    this.app.post('/register-clinic', async (req, res) => {
+      if (!requireAdminAuth(req, res)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
       }
       try {
@@ -1018,13 +1060,10 @@ class WebhookAPIServer {
 
     // Admin Cliniko detection (secured)
     this.app.post('/admin/cliniko/detect', async (req, res) => {
+      if (!requireAdminAuth(req, res)) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
       try {
-        const auth = req.header('authorization') || '';
-        const expected = process.env.ADMIN_BEARER_TOKEN;
-        if (!expected || !auth.startsWith('Bearer ') || auth.replace('Bearer ', '') !== expected) {
-          return res.status(401).json({ success: false, error: 'Unauthorized' });
-        }
-
         const { clinikApiKey, shard } = req.body || {};
         if (!clinikApiKey) {
           return res.status(400).json({ success: false, error: 'Missing Cliniko API key' });
