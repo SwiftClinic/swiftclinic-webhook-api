@@ -1038,7 +1038,11 @@ class WebhookAPIServer {
             const baseUrl = `https://api.${s}.cliniko.com/v1`;
             const response = await axios.get(`${baseUrl}/businesses`, {
               auth: { username: clinikApiKey, password: '' },
-              timeout: 15000
+              timeout: 15000,
+              headers: {
+                Accept: 'application/json',
+                'User-Agent': 'SwiftClinic Admin/1.0 (support@swiftclinic.ai)'
+              }
             });
             const businesses = (response.data?.businesses || []).map((b: any) => ({
               id: String(b.id),
@@ -1049,6 +1053,7 @@ class WebhookAPIServer {
             return res.json({ success: true, data: { shard: s, businesses } });
           } catch (err: any) {
             // try next shard
+            console.warn('Cliniko detect failed on shard', s, err?.response?.status || err?.code || err?.message);
           }
         }
 
