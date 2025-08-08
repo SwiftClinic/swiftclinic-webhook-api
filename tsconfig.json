@@ -28,5 +28,13 @@
     "shared/security/**/*",
     "shared/types/**/*"
   ],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    // Exclude mirrored compliance/tenant modules not used by webhook runtime
+    "src/shared/compliance/**",
+    "src/shared/security/multi-tenant-auth.ts",
+    "src/shared/types/multi-tenant.ts"
+  ]
 }
