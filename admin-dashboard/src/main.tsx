@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import './styles.css'
 
 const BASE_DEFAULT = (import.meta as any).env?.VITE_API_BASE || 'https://swiftclinic-webhook-api-production.up.railway.app'
 
-const colors = { primary: '#3FC5D4', secondary: '#E2E8F0', text: '#0f172a' }
-const appStyle: React.CSSProperties = { fontFamily: 'Poppins, system-ui, sans-serif', color: colors.text, background: colors.secondary, minHeight: '100vh' }
-
-function Badge({ text }:{ text:string }){ return <span style={{ background:colors.primary, color:'#0b132b', padding:'2px 8px', borderRadius:999, fontSize:12, fontWeight:700 }}>{text}</span> }
+function Badge({ text }:{ text:string }){ return <span className="badge">{text}</span> }
 
 function Login({ baseUrl, onAuth }: { baseUrl: string; onAuth: (token: string) => void }) {
   const [email, setEmail] = useState('')
@@ -23,17 +21,17 @@ function Login({ baseUrl, onAuth }: { baseUrl: string; onAuth: (token: string) =
   }
   return (
     <div style={{ display:'grid', placeItems:'center', minHeight:'100vh', padding:24 }}>
-      <div style={{ width: 420, background:'#fff', borderRadius:16, boxShadow:'0 12px 30px rgba(16,24,40,0.08)', padding:32 }}>
+      <div className="card" style={{ width:420 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
           <img src="https://i.imgur.com/5tByDtV.png" alt="SwiftClinic" style={{ height: 36 }} />
           <h2 style={{ margin:0 }}>SwiftClinic Admin</h2>
         </div>
-        <p style={{ marginTop:0, color:'#475569' }}>Sign in to continue</p>
+        <p className="muted" style={{ marginTop:0 }}>Sign in to continue</p>
         <div style={{ display:'grid', gap:12 }}>
-          <label>Email<input value={email} onChange={e=>setEmail(e.target.value)} style={{ width:'100%', padding:12, borderRadius:8, border:'1px solid #cbd5e1' }} /></label>
-          <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={{ width:'100%', padding:12, borderRadius:8, border:'1px solid #cbd5e1' }} /></label>
-          <button onClick={login} style={{ padding:'12px 16px', background: colors.primary, color:'#0b132b', border:'none', borderRadius:10, fontWeight:600 }}>Sign In</button>
-          <div style={{ fontSize:12, color:'#6b7280', minHeight:18 }}>{status}</div>
+          <label>Email<input value={email} onChange={e=>setEmail(e.target.value)} className="input input-full" /></label>
+          <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="input input-full" /></label>
+          <button onClick={login} className="btn btn-primary">Sign In</button>
+          <div className="small muted" style={{ minHeight:18 }}>{status}</div>
         </div>
       </div>
     </div>
@@ -42,20 +40,17 @@ function Login({ baseUrl, onAuth }: { baseUrl: string; onAuth: (token: string) =
 
 function Sidebar({ tab, setTab, onLogout }:{ tab:string; setTab:(t:string)=>void; onLogout:()=>void }){
   const Item = ({ id, label }:{id:string;label:string}) => (
-    <button onClick={()=>setTab(id)} style={{ width:'100%', textAlign:'left', padding:'10px 12px', margin:'4px 0', border:'none', borderRadius:8, background: tab===id? '#fff' : 'transparent', fontWeight:600 }}>{label}</button>
+    <button onClick={()=>setTab(id)} className={`nav-btn ${tab===id?'active':''}`}>{label}</button>
   )
   return (
-    <aside style={{ width:260, padding:16 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-        <img src="https://i.imgur.com/5tByDtV.png" alt="SwiftClinic" style={{ height: 28 }} />
-        <strong>Admin</strong>
-      </div>
+    <aside className="sidebar">
+      <div className="brand"><img src="https://i.imgur.com/5tByDtV.png" className="logo" /><strong>Admin</strong></div>
       <Item id="dashboard" label="Dashboard" />
       <Item id="onboard" label="Onboard Clinic" />
       <Item id="clinics" label="Clinics" />
       <Item id="activity" label="Activity" />
       <div style={{ marginTop:16 }}>
-        <button onClick={onLogout} style={{ padding:'8px 12px', width:'100%', borderRadius:8 }}>Logout</button>
+        <button onClick={onLogout} className="btn btn-muted input-full">Logout</button>
       </div>
     </aside>
   )
@@ -81,29 +76,29 @@ function Clinics({ baseUrl, token }:{ baseUrl:string; token:string }){
   }
   const copy = async (txt:string)=>{ try{ await navigator.clipboard.writeText(txt); setStatus('Copied') }catch{} }
   return (
-    <section style={{ background:'#fff', borderRadius:12, padding:16, boxShadow:'0 4px 14px rgba(2,8,20,0.05)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+    <section className="card">
+      <div className="header">
         <h3>Clinics <Badge text={`${rows.length}`} /></h3>
-        <input placeholder="Search clinics" value={query} onChange={e=>setQuery(e.target.value)} style={{ padding:8, border:'1px solid #cbd5e1', borderRadius:8 }} />
+        <input placeholder="Search clinics" value={query} onChange={e=>setQuery(e.target.value)} className="input" />
       </div>
-      <table style={{ width:'100%', borderCollapse:'collapse', marginTop:12 }}>
-        <thead><tr style={{ textAlign:'left' }}><th>Name</th><th>Webhook</th><th>TZ</th><th>Status</th><th></th></tr></thead>
+      <table className="table">
+        <thead><tr><th>Name</th><th>Webhook</th><th>TZ</th><th>Status</th><th></th></tr></thead>
         <tbody>
           {filtered.map(r=> (
-            <tr key={r.id} style={{ borderTop:'1px solid #e5e7eb' }}>
+            <tr key={r.id}>
               <td>{r.name}</td>
               <td>
                 <code>{r.webhookUrl}</code>
-                <button onClick={()=>copy(`${baseUrl}/webhook/${r.webhookUrl}`)} style={{ marginLeft:8, padding:'4px 8px' }}>Copy URL</button>
+                <button onClick={()=>copy(`${baseUrl}/webhook/${r.webhookUrl}`)} className="btn btn-muted" style={{ marginLeft:8 }}>Copy URL</button>
               </td>
               <td>{r.timezone||'-'}</td>
               <td>{r.isActive? 'Active':'Inactive'}</td>
-              <td><button onClick={()=>toggle(r.id)} style={{ padding:'6px 10px' }}>{r.isActive? 'Deactivate':'Activate'}</button></td>
+              <td><button onClick={()=>toggle(r.id)} className="btn btn-muted">{r.isActive? 'Deactivate':'Activate'}</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div style={{ marginTop:8, fontSize:12, color:'#6b7280' }}>{status}</div>
+      <div className="small muted" style={{ marginTop:8 }}>{status}</div>
     </section>
   )
 }
@@ -126,11 +121,11 @@ function Activity({ baseUrl, token }:{ baseUrl:string; token:string }){
   }
   useEffect(()=>{ load() },[])
   return (
-    <section style={{ background:'#fff', borderRadius:12, padding:16, boxShadow:'0 4px 14px rgba(2,8,20,0.05)' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+    <section className="card">
+      <div className="header" style={{ gap:12 }}>
         <h3>Activity <Badge text={`${rows.length}`} /></h3>
-        <input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)} style={{ padding:8, border:'1px solid #cbd5e1', borderRadius:8 }} />
-        <input type="date" value={since} onChange={e=>setSince(e.target.value)} style={{ padding:8, border:'1px solid #cbd5e1', borderRadius:8 }} />
+        <input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)} className="input" />
+        <input type="date" value={since} onChange={e=>setSince(e.target.value)} className="input" />
       </div>
       <ul style={{ listStyle:'none', padding:0, margin:0 }}>
         {filtered.map((r:any)=> (
@@ -139,7 +134,7 @@ function Activity({ baseUrl, token }:{ baseUrl:string; token:string }){
           </li>
         ))}
       </ul>
-      <div style={{ marginTop:8, fontSize:12, color:'#6b7280' }}>{status}</div>
+      <div className="small muted" style={{ marginTop:8 }}>{status}</div>
     </section>
   )
 }
@@ -181,34 +176,34 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
   const generateUuid=()=> setUuid((globalThis.crypto && 'randomUUID' in globalThis.crypto)? globalThis.crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,6)}`)
 
   return (
-    <section style={{ background:'#fff', borderRadius:12, padding:16, boxShadow:'0 4px 14px rgba(2,8,20,0.05)' }}>
+    <section className="card">
       <h3>Onboard Clinic</h3>
       <div style={{ display:'grid', gap:12 }}>
         <div>
           <label>API key:&nbsp;
-            <input type={showKey ? 'text':'password'} value={apiKey} onChange={e=>setApiKey(e.target.value)} size={60} />
+            <input type={showKey ? 'text':'password'} value={apiKey} onChange={e=>setApiKey(e.target.value)} className="input" />
           </label>
-          <button onClick={()=>setShowKey(s=>!s)} style={{ marginLeft:8, padding:'6px 10px' }}>{showKey ? 'Hide' : 'Show'}</button>
+          <button onClick={()=>setShowKey(s=>!s)} className="btn btn-muted" style={{ marginLeft:8 }}>{showKey ? 'Hide' : 'Show'}</button>
         </div>
-        <label>Shard (optional):&nbsp;<input value={shard} onChange={e=>setShard(e.target.value)} placeholder="uk2/us1/au1/ca1" /></label>
-        <button onClick={detect} style={{ padding:'10px 14px', background: colors.primary, border:'none', borderRadius:8, fontWeight:600 }}>Detect businesses</button>
+        <label>Shard (optional):&nbsp;<input value={shard} onChange={e=>setShard(e.target.value)} className="input" placeholder="uk2/us1/au1/ca1" /></label>
+        <button onClick={detect} className="btn btn-primary">Detect businesses</button>
         {businesses.length>0 && (
           <div>
             <p>{businesses.length} businesses found.</p>
-            <select value={selectedBusiness?.id||''} onChange={e=> setSelectedBusiness(businesses.find(b=> String(b.id)===e.target.value))}>
+            <select value={selectedBusiness?.id||''} onChange={e=> setSelectedBusiness(businesses.find(b=> String(b.id)===e.target.value))} className="input">
               <option value="">Select business</option>
               {businesses.map((b:any)=> <option key={b.id} value={b.id}>{b.name} ({b.time_zone})</option>)}
             </select>
           </div>
         )}
         <div>
-          <label>Timezone (auto):&nbsp;<input value={timezone} onChange={e=>setTimezone(e.target.value)} /></label>
+          <label>Timezone (auto):&nbsp;<input value={timezone} onChange={e=>setTimezone(e.target.value)} className="input" /></label>
         </div>
         <div>
-          <label>Webhook UUID:&nbsp;<input value={uuid} onChange={e=>setUuid(e.target.value)} size={60} /></label>
-          <button onClick={generateUuid} style={{marginLeft:8, padding:'8px 12px'}}>Generate UUID</button>
+          <label>Webhook UUID:&nbsp;<input value={uuid} onChange={e=>setUuid(e.target.value)} className="input" /></label>
+          <button onClick={generateUuid} className="btn btn-muted" style={{marginLeft:8}}>Generate UUID</button>
         </div>
-        <button onClick={register} style={{ padding:'10px 14px', background: colors.primary, border:'none', borderRadius:8, fontWeight:600 }}>Register clinic</button>
+        <button onClick={register} className="btn btn-primary">Register clinic</button>
       </div>
     </section>
   )
@@ -216,7 +211,7 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
 
 function Dashboard({ baseUrl }:{ baseUrl:string }){
   return (
-    <section style={{ background:'#fff', borderRadius:12, padding:16, boxShadow:'0 4px 14px rgba(2,8,20,0.05)' }}>
+    <section className="card">
       <h3>Welcome</h3>
       <p>Use Onboard Clinic to import from Cliniko and generate a webhook. Manage existing clinics under Clinics. Track actions under Activity.</p>
       <p>API Base: <code>{baseUrl}</code></p>
@@ -233,13 +228,13 @@ function App(){
   if (!token) return <Login baseUrl={baseUrl} onAuth={setToken} />
 
   return (
-    <div style={appStyle}>
-      <div style={{ display:'grid', gridTemplateColumns:'260px 1fr', gap:12, maxWidth: 1200, margin: '24px auto' }}>
+    <div>
+      <div className="container">
         <Sidebar tab={tab} setTab={setTab} onLogout={()=>{ sessionStorage.removeItem('adminToken'); setToken(null) }} />
-        <main style={{ paddingRight:16 }}>
-          <section style={{ background:'#fff', borderRadius:12, padding:16, boxShadow:'0 4px 14px rgba(2,8,20,0.05)', marginBottom:16 }}>
-            <h3 style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>Admin <Badge text="live" /></h3>
-            <label>API Base URL:&nbsp;<input value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} size={60} /></label>
+        <main>
+          <section className="card" style={{ marginBottom:16 }}>
+            <h3>Admin <Badge text="live" /></h3>
+            <label>API Base URL:&nbsp;<input value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} className="input" /></label>
           </section>
           {tab==='dashboard' && <Dashboard baseUrl={baseUrl} />}
           {tab==='onboard' && <Onboard baseUrl={baseUrl} token={token!} />}
