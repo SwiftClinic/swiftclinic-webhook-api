@@ -249,33 +249,70 @@ function Dashboard({ baseUrl }:{ baseUrl:string }){
   )
 }
 
-function Testing({ baseUrl }:{ baseUrl:string }){
+function Testing({ baseUrl, token }:{ baseUrl:string; token:string }){
+  const [clinics, setClinics] = useState<{id:string; name:string; webhookUrl:string}[]>([])
+  const [selectedClinic, setSelectedClinic] = useState('')
   const [inputUrl, setInputUrl] = useState('')
   const [message, setMessage] = useState('Hello, can I book next Thursday?')
-  const [sessionId, setSessionId] = useState(`admin-test-${Math.random().toString(36).slice(2,8)}`)
+  const [sessions, setSessions] = useState<string[]>([ `admin-test-${Math.random().toString(36).slice(2,8)}` ])
+  const [sessionIndex, setSessionIndex] = useState(0)
   const [log, setLog] = useState<string[]>([])
 
-  const computeUrl = ()=> inputUrl.startsWith('http') ? inputUrl : (inputUrl? `${baseUrl}/webhook/${inputUrl}`:'')
+  const sessionId = sessions[sessionIndex]
+
+  useEffect(()=>{ (async()=>{
+    try{
+      const res = await fetch(`${baseUrl}/admin/clinics`, { headers:{ Authorization:`Bearer ${token}` } })
+      const data = await res.json(); if (data.success) setClinics(data.data || [])
+    }catch{}
+  })() },[])
+
+  function computeUrl(){
+    if (inputUrl.startsWith('http')) return inputUrl
+    const uuid = inputUrl || selectedClinic
+    return uuid ? `${baseUrl}/webhook/${uuid}` : ''
+  }
 
   async function send(){
-    const url = computeUrl(); if (!url) { setLog(l=>[...l, 'Enter webhook UUID or full URL']); return }
+    const url = computeUrl(); if (!url) { setLog(l=>[...l, 'Enter webhook UUID or select a clinic']); return }
     setLog(l=>[...l, `> POST ${url}`])
     const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message, sessionId, userConsent:true }) })
     const data = await res.json();
     setLog(l=>[...l, JSON.stringify(data)])
   }
 
+  function nextSession(){
+    const next = `admin-test-${Math.random().toString(36).slice(2,8)}`
+    setSessions(s=>[...s, next])
+    setSessionIndex(i=>i+1)
+  }
+  function prevSession(){ setSessionIndex(i=> Math.max(0, i-1)) }
+
   return (
     <section className="card">
       <h3>Testing</h3>
       <div style={{ display:'grid', gap:12 }}>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <label style={{ flex:1 }}>Clinic:&nbsp;
+            <select className="input input-full" value={selectedClinic} onChange={e=>{ setSelectedClinic(e.target.value); setInputUrl(e.target.value) }}>
+              <option value="">— Select clinic (optional) —</option>
+              {clinics.map(c=> <option key={c.id} value={c.webhookUrl}>{c.name} ({c.webhookUrl})</option>)}
+            </select>
+          </label>
+        </div>
         <label>Webhook (UUID or full URL):&nbsp;<input className="input input-full" placeholder="6fb8... or https://.../webhook/6fb8..." value={inputUrl} onChange={e=>setInputUrl(e.target.value)} /></label>
         <label>Message:&nbsp;<input className="input input-full" value={message} onChange={e=>setMessage(e.target.value)} /></label>
-        <label>Session ID:&nbsp;<input className="input" value={sessionId} onChange={e=>setSessionId(e.target.value)} /></label>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span>Session:</span>
+          <button className="btn btn-muted" onClick={prevSession}>‹</button>
+          <input className="input" value={sessionId} onChange={e=>{ const v=e.target.value; setSessions(s=>{ const copy=[...s]; copy[sessionIndex]=v; return copy }) }} />
+          <button className="btn btn-muted" onClick={nextSession}>›</button>
+          <span className="small muted">({sessionIndex+1}/{sessions.length})</span>
+        </div>
         <button onClick={send} className="btn btn-primary">Send</button>
         <pre className="small" style={{ background:'#f5f5f5', padding:12, whiteSpace:'pre-wrap' }}>{log.join('\n')}</pre>
       </div>
-      </section>
+    </section>
   )
 }
 
@@ -300,7 +337,7 @@ function App(){
           {tab==='onboard' && <Onboard baseUrl={baseUrl} token={token!} />}
           {tab==='clinics' && <Clinics baseUrl={baseUrl} token={token!} />}
           {tab==='activity' && <Activity baseUrl={baseUrl} token={token!} />}
-          {tab==='testing' && <Testing baseUrl={baseUrl} />}
+          {tab==='testing' && <Testing baseUrl={baseUrl} token={token!} />}
         </main>
       </div>
     </div>
