@@ -1153,6 +1153,39 @@ class WebhookAPIServer {
       }
     });
 
+    // Admin Cliniko business details (secured)
+    this.app.post('/admin/cliniko/business', async (req, res) => {
+      if (!requireAdminAuth(req, res)) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
+      try {
+        const { clinikApiKey, shard, businessId } = req.body || {};
+        if (!clinikApiKey || !shard || !businessId) {
+          return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+        const axios = (await import('axios')).default;
+        const baseUrl = `https://api.${shard}.cliniko.com/v1`;
+        const resp = await axios.get(`${baseUrl}/businesses/${businessId}`, {
+          auth: { username: clinikApiKey, password: '' },
+          timeout: 15000,
+          headers: { Accept: 'application/json', 'User-Agent': 'SwiftClinic Admin/1.0 (support@swiftclinic.ai)' }
+        });
+        const b = resp.data || {};
+        return res.json({
+          success: true,
+          data: {
+            id: String(b.id || businessId),
+            business_name: b.business_name || b.name,
+            time_zone_identifier: b.time_zone_identifier || b.time_zone,
+            city: (b.address && b.address.city) || b.city || ''
+          }
+        });
+      } catch (e: any) {
+        console.error('cliniko/business error:', e?.message || e);
+        return res.status(500).json({ success: false, error: 'Failed to fetch business details' });
+      }
+    });
+
     // Testing endpoint for specific clinic
     this.app.post('/test/:webhookId', this.testConnection.bind(this));
 
