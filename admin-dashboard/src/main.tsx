@@ -256,7 +256,7 @@ function Testing({ baseUrl, token }:{ baseUrl:string; token:string }){
   const [message, setMessage] = useState('Hello, can I book next Thursday?')
   const [sessions, setSessions] = useState<string[]>([ `admin-test-${Math.random().toString(36).slice(2,8)}` ])
   const [sessionIndex, setSessionIndex] = useState(0)
-  const [log, setLog] = useState<string[]>([])
+  const [chat, setChat] = useState<{ role:'user'|'assistant'; content:string; ts:string }[]>([])
 
   const sessionId = sessions[sessionIndex]
 
@@ -274,19 +274,27 @@ function Testing({ baseUrl, token }:{ baseUrl:string; token:string }){
   }
 
   async function send(){
-    const url = computeUrl(); if (!url) { setLog(l=>[...l, 'Enter webhook UUID or select a clinic']); return }
-    setLog(l=>[...l, `> POST ${url}`])
-    const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message, sessionId, userConsent:true }) })
-    const data = await res.json();
-    setLog(l=>[...l, JSON.stringify(data)])
+    const url = computeUrl(); if (!url) { return }
+    const now = new Date().toLocaleTimeString()
+    setChat(list=>[...list, { role:'user', content:message, ts: now }])
+    setMessage('')
+    try{
+      const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message, sessionId, userConsent:true }) })
+      const data = await res.json();
+      const reply = data?.data?.message || data?.error || JSON.stringify(data)
+      setChat(list=>[...list, { role:'assistant', content:reply, ts: new Date().toLocaleTimeString() }])
+    }catch(e:any){
+      setChat(list=>[...list, { role:'assistant', content:`Error: ${e.message}`, ts: new Date().toLocaleTimeString() }])
+    }
   }
 
   function nextSession(){
     const next = `admin-test-${Math.random().toString(36).slice(2,8)}`
     setSessions(s=>[...s, next])
     setSessionIndex(i=>i+1)
+    setChat([])
   }
-  function prevSession(){ setSessionIndex(i=> Math.max(0, i-1)) }
+  function prevSession(){ setSessionIndex(i=>{ const ni=Math.max(0, i-1); if(ni!==i) setChat([]); return ni }) }
 
   return (
     <section className="card">
@@ -294,14 +302,13 @@ function Testing({ baseUrl, token }:{ baseUrl:string; token:string }){
       <div style={{ display:'grid', gap:12 }}>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <label style={{ flex:1 }}>Clinic:&nbsp;
-            <select className="input input-full" value={selectedClinic} onChange={e=>{ setSelectedClinic(e.target.value); setInputUrl(e.target.value) }}>
+            <select className="input input-full" value={selectedClinic} onChange={e=>{ setSelectedClinic(e.target.value); setInputUrl(e.target.value); setChat([]) }}>
               <option value="">— Select clinic (optional) —</option>
               {clinics.map(c=> <option key={c.id} value={c.webhookUrl}>{c.name} ({c.webhookUrl})</option>)}
             </select>
           </label>
         </div>
         <label>Webhook (UUID or full URL):&nbsp;<input className="input input-full" placeholder="6fb8... or https://.../webhook/6fb8..." value={inputUrl} onChange={e=>setInputUrl(e.target.value)} /></label>
-        <label>Message:&nbsp;<input className="input input-full" value={message} onChange={e=>setMessage(e.target.value)} /></label>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span>Session:</span>
           <button className="btn btn-muted" onClick={prevSession}>‹</button>
@@ -309,8 +316,18 @@ function Testing({ baseUrl, token }:{ baseUrl:string; token:string }){
           <button className="btn btn-muted" onClick={nextSession}>›</button>
           <span className="small muted">({sessionIndex+1}/{sessions.length})</span>
         </div>
-        <button onClick={send} className="btn btn-primary">Send</button>
-        <pre className="small" style={{ background:'#f5f5f5', padding:12, whiteSpace:'pre-wrap' }}>{log.join('\n')}</pre>
+        <div className="chat">
+          {chat.map((m,i)=> (
+            <div key={i} style={{ display:'flex', flexDirection:'column', alignItems: m.role==='user'?'flex-end':'flex-start' }}>
+              <div className={`msg ${m.role==='user'?'msg-user':'msg-assistant'}`}>{m.content}</div>
+              <div className="msg-meta">{m.ts}</div>
+            </div>
+          ))}
+        </div>
+        <div className="chat-input">
+          <input className="input" placeholder="Type a message..." value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && message.trim()) send() }} />
+          <button onClick={send} className="btn btn-primary">Send</button>
+        </div>
       </div>
     </section>
   )
