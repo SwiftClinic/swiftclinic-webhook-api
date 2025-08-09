@@ -49,6 +49,7 @@ function Sidebar({ tab, setTab, onLogout }:{ tab:string; setTab:(t:string)=>void
       <Item id="onboard" label="Onboard Clinic" />
       <Item id="clinics" label="Clinics" />
       <Item id="activity" label="Activity" />
+      <Item id="testing" label="Testing" />
       <div style={{ marginTop:16 }}>
         <button onClick={onLogout} className="btn btn-muted input-full">Logout</button>
       </div>
@@ -191,6 +192,12 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
     setStatus(`Registered. Webhook: ${baseUrl}/webhook/${uuid}`)
     setRegistered(true)
     setTimeout(()=> setRegistered(false), 1500)
+    // Clear all Onboard fields (except API Base URL which lives at App level)
+    setApiKey(''); localStorage.setItem('apiKey','')
+    setShard(''); localStorage.setItem('shard','')
+    setBusinesses([]); setSelectedBusiness(null); setBusinessSummary({})
+    setTimezone(''); localStorage.setItem('timezone','')
+    setUuid(''); localStorage.setItem('uuid','')
   }
 
   const generateUuid=()=> setUuid((globalThis.crypto && 'randomUUID' in globalThis.crypto)? globalThis.crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,6)}`)
@@ -208,12 +215,12 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
         <label>Shard (optional):&nbsp;<input value={shard} onChange={e=>setShard(e.target.value)} className="input" placeholder="uk2/us1/au1/ca1" /></label>
         <button onClick={detect} className="btn btn-primary">Detect businesses</button>
         {businesses.length>0 && (
-          <div>
-            <p>{businesses.length} businesses found.</p>
+        <div>
+              <p>{businesses.length} businesses found.</p>
             <select value={selectedBusiness?.id||''} onChange={e=> setSelectedBusiness(businesses.find(b=> String(b.id)===e.target.value))} className="input">
-              <option value="">Select business</option>
+                <option value="">Select business</option>
               {businesses.map((b:any)=> <option key={b.id} value={b.id}>{b.business_name || b.display_name || b.id} ({b.time_zone_identifier || b.time_zone})</option>)}
-            </select>
+              </select>
           </div>
         )}
         {selectedBusiness && (
@@ -227,8 +234,8 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
           <button onClick={generateUuid} className="btn btn-muted" style={{marginLeft:8}}>Generate UUID</button>
         </div>
         <button onClick={register} className={`btn ${registered? 'btn-success pulse-success':'btn-primary'}`}>{registered? 'Registered ✓':'Register clinic'}</button>
-      </div>
-    </section>
+        </div>
+      </section>
   )
 }
 
@@ -236,14 +243,44 @@ function Dashboard({ baseUrl }:{ baseUrl:string }){
   return (
     <section className="card">
       <h3>Welcome</h3>
-      <p>Use Onboard Clinic to import from Cliniko and generate a webhook. Manage existing clinics under Clinics. Track actions under Activity.</p>
+      <p>Use Onboard Clinic to import from Cliniko and generate a webhook. Manage existing clinics under Clinics. Track actions under Activity. Test webhooks under Testing.</p>
       <p>API Base: <code>{baseUrl}</code></p>
-    </section>
+      </section>
+  )
+}
+
+function Testing({ baseUrl }:{ baseUrl:string }){
+  const [inputUrl, setInputUrl] = useState('')
+  const [message, setMessage] = useState('Hello, can I book next Thursday?')
+  const [sessionId, setSessionId] = useState(`admin-test-${Math.random().toString(36).slice(2,8)}`)
+  const [log, setLog] = useState<string[]>([])
+
+  const computeUrl = ()=> inputUrl.startsWith('http') ? inputUrl : (inputUrl? `${baseUrl}/webhook/${inputUrl}`:'')
+
+  async function send(){
+    const url = computeUrl(); if (!url) { setLog(l=>[...l, 'Enter webhook UUID or full URL']); return }
+    setLog(l=>[...l, `> POST ${url}`])
+    const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message, sessionId, userConsent:true }) })
+    const data = await res.json();
+    setLog(l=>[...l, JSON.stringify(data)])
+  }
+
+  return (
+    <section className="card">
+      <h3>Testing</h3>
+      <div style={{ display:'grid', gap:12 }}>
+        <label>Webhook (UUID or full URL):&nbsp;<input className="input input-full" placeholder="6fb8... or https://.../webhook/6fb8..." value={inputUrl} onChange={e=>setInputUrl(e.target.value)} /></label>
+        <label>Message:&nbsp;<input className="input input-full" value={message} onChange={e=>setMessage(e.target.value)} /></label>
+        <label>Session ID:&nbsp;<input className="input" value={sessionId} onChange={e=>setSessionId(e.target.value)} /></label>
+        <button onClick={send} className="btn btn-primary">Send</button>
+        <pre className="small" style={{ background:'#f5f5f5', padding:12, whiteSpace:'pre-wrap' }}>{log.join('\n')}</pre>
+      </div>
+      </section>
   )
 }
 
 function App(){
-  const [tab, setTab] = useState<'dashboard'|'onboard'|'clinics'|'activity'>('dashboard')
+  const [tab, setTab] = useState<'dashboard'|'onboard'|'clinics'|'activity'|'testing'>('dashboard')
   const [token, setToken] = useState<string | null>(sessionStorage.getItem('adminToken'))
   const [baseUrl, setBaseUrl] = useState(localStorage.getItem('baseUrl') || BASE_DEFAULT)
   useEffect(()=>{ localStorage.setItem('baseUrl', baseUrl) },[baseUrl])
@@ -263,6 +300,7 @@ function App(){
           {tab==='onboard' && <Onboard baseUrl={baseUrl} token={token!} />}
           {tab==='clinics' && <Clinics baseUrl={baseUrl} token={token!} />}
           {tab==='activity' && <Activity baseUrl={baseUrl} token={token!} />}
+          {tab==='testing' && <Testing baseUrl={baseUrl} />}
         </main>
       </div>
     </div>
