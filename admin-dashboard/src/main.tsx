@@ -149,6 +149,7 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
   const [uuid, setUuid] = useState(localStorage.getItem('uuid') || '')
   const [status, setStatus] = useState('')
   const [businessSummary, setBusinessSummary] = useState<{name?:string; city?:string; tz?:string}>({})
+  const [registered, setRegistered] = useState(false)
 
   useEffect(()=>{ localStorage.setItem('apiKey', apiKey) },[apiKey])
   useEffect(()=>{ localStorage.setItem('shard', shard) },[shard])
@@ -184,10 +185,12 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
 
   async function register(){
     if (!uuid || !selectedBusiness) { setStatus('Generate UUID and select business'); return }
-    setStatus('Registering clinic...')
+    setStatus('Registering clinic...'); setRegistered(false)
     const res = await fetch(`${baseUrl}/register-clinic`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` }, body: JSON.stringify({ uniqueWebhookId: uuid, clinicId:`clinic-${uuid}`, clinicName: businessSummary.name || 'SwiftClinic', apiConfiguration:{ clinikApiKey: apiKey, shard, businessId: selectedBusiness.id, timezone } }) })
     const data = await res.json(); if(!data.success){ setStatus(`Register failed: ${data.error||res.status}`); return }
     setStatus(`Registered. Webhook: ${baseUrl}/webhook/${uuid}`)
+    setRegistered(true)
+    setTimeout(()=> setRegistered(false), 1500)
   }
 
   const generateUuid=()=> setUuid((globalThis.crypto && 'randomUUID' in globalThis.crypto)? globalThis.crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2,10)}-${Math.random().toString(16).slice(2,6)}`)
@@ -223,7 +226,7 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
           <label>Webhook UUID:&nbsp;<input value={uuid} onChange={e=>setUuid(e.target.value)} className="input" /></label>
           <button onClick={generateUuid} className="btn btn-muted" style={{marginLeft:8}}>Generate UUID</button>
         </div>
-        <button onClick={register} className="btn btn-primary">Register clinic</button>
+        <button onClick={register} className={`btn ${registered? 'btn-success pulse-success':'btn-primary'}`}>{registered? 'Registered ✓':'Register clinic'}</button>
       </div>
     </section>
   )
