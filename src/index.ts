@@ -1132,13 +1132,17 @@ class WebhookAPIServer {
                 'User-Agent': 'SwiftClinic Admin/1.0 (support@swiftclinic.ai)'
               }
             });
-            const businesses = (response.data?.businesses || []).map((b: any) => ({
-              id: String(b.id),
-              name: b.name,
-              time_zone: b.time_zone,
-              iana: mapToIANA(b.time_zone),
-              raw: b
-            }));
+            const businesses = (response.data?.businesses || []).map((b: any) => {
+              const businessName = b.business_name || b.display_name || b.name || `Business ${b.id}`;
+              const tzId = b.time_zone_identifier || b.time_zone;
+              return {
+                id: String(b.id),
+                business_name: businessName,
+                time_zone_identifier: tzId,
+                iana: mapToIANA(tzId),
+                raw: b
+              };
+            });
             return res.json({ success: true, data: { shard: s, businesses } });
           } catch (err: any) {
             // try next shard

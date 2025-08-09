@@ -148,6 +148,7 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
   const [timezone, setTimezone] = useState(localStorage.getItem('timezone') || 'Europe/London')
   const [uuid, setUuid] = useState(localStorage.getItem('uuid') || '')
   const [status, setStatus] = useState('')
+  const [businessSummary, setBusinessSummary] = useState<{name?:string; city?:string; tz?:string}>({})
 
   useEffect(()=>{ localStorage.setItem('apiKey', apiKey) },[apiKey])
   useEffect(()=>{ localStorage.setItem('shard', shard) },[shard])
@@ -160,15 +161,31 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
     const data = await res.json(); if(!data.success){ setStatus(`Detect failed: ${data.error||res.status}`); return }
     setShard(data.data.shard)
     setBusinesses(data.data.businesses || [])
+    setSelectedBusiness(null)
+    setBusinessSummary({})
     setStatus(`Detected shard ${data.data.shard}. Select business.`)
   }
 
-  useEffect(()=>{ if (selectedBusiness) { setTimezone(selectedBusiness.iana || selectedBusiness.time_zone || 'UTC') }}, [selectedBusiness])
+  useEffect(()=>{ (async()=>{
+    if (!selectedBusiness) return;
+    setStatus('Fetching business details...')
+    try{
+      const res = await fetch(`${baseUrl}/admin/cliniko/business`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` }, body: JSON.stringify({ clinikApiKey: apiKey, shard, businessId: selectedBusiness.id }) })
+      const data = await res.json();
+      if (data.success){
+        setTimezone(data.data.time_zone_identifier || timezone)
+        setBusinessSummary({ name: data.data.business_name, city: data.data.city, tz: data.data.time_zone_identifier })
+        setStatus('Business details loaded.')
+      } else {
+        setStatus(`Details failed: ${data.error||res.status}`)
+      }
+    }catch(e:any){ setStatus(`Details error: ${e.message}`) }
+  })() },[selectedBusiness])
 
   async function register(){
     if (!uuid || !selectedBusiness) { setStatus('Generate UUID and select business'); return }
     setStatus('Registering clinic...')
-    const res = await fetch(`${baseUrl}/register-clinic`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` }, body: JSON.stringify({ uniqueWebhookId: uuid, clinicId:`clinic-${uuid}`, clinicName: 'SwiftClinic', apiConfiguration:{ clinikApiKey: apiKey, shard, businessId: selectedBusiness.id, timezone } }) })
+    const res = await fetch(`${baseUrl}/register-clinic`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` }, body: JSON.stringify({ uniqueWebhookId: uuid, clinicId:`clinic-${uuid}`, clinicName: businessSummary.name || 'SwiftClinic', apiConfiguration:{ clinikApiKey: apiKey, shard, businessId: selectedBusiness.id, timezone } }) })
     const data = await res.json(); if(!data.success){ setStatus(`Register failed: ${data.error||res.status}`); return }
     setStatus(`Registered. Webhook: ${baseUrl}/webhook/${uuid}`)
   }
@@ -192,9 +209,12 @@ function Onboard({ baseUrl, token }:{ baseUrl:string; token:string }){
             <p>{businesses.length} businesses found.</p>
             <select value={selectedBusiness?.id||''} onChange={e=> setSelectedBusiness(businesses.find(b=> String(b.id)===e.target.value))} className="input">
               <option value="">Select business</option>
-              {businesses.map((b:any)=> <option key={b.id} value={b.id}>{b.name} ({b.time_zone})</option>)}
+              {businesses.map((b:any)=> <option key={b.id} value={b.id}>{b.business_name || b.display_name || b.id} ({b.time_zone_identifier || b.time_zone})</option>)}
             </select>
           </div>
+        )}
+        {selectedBusiness && (
+          <div className="small muted">Selected: <strong>{businessSummary.name || selectedBusiness.business_name}</strong> {businessSummary.city? `— ${businessSummary.city}`:''}</div>
         )}
         <div>
           <label>Timezone (auto):&nbsp;<input value={timezone} onChange={e=>setTimezone(e.target.value)} className="input" /></label>
