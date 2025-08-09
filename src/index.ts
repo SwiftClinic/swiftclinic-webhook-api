@@ -1114,6 +1114,12 @@ class WebhookAPIServer {
 
         const shardsToTry = shard ? [shard] : ['uk2', 'us1', 'au1', 'ca1'];
         const axios = (await import('axios')).default;
+        const momentTz = (await import('moment-timezone')).default;
+
+        const mapToIANA = (tz?: string): string => {
+          if (!tz) return 'UTC';
+          try { return momentTz.tz.zone(tz) ? tz : 'UTC'; } catch { return 'UTC'; }
+        };
 
         for (const s of shardsToTry) {
           try {
@@ -1130,6 +1136,7 @@ class WebhookAPIServer {
               id: String(b.id),
               name: b.name,
               time_zone: b.time_zone,
+              iana: mapToIANA(b.time_zone),
               raw: b
             }));
             return res.json({ success: true, data: { shard: s, businesses } });
