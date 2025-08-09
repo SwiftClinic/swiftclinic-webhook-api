@@ -210,6 +210,16 @@ export class SecureDatabase {
       )
     `);
 
+    // Admin activity log (for operational visibility)
+    await this.db.exec(`
+      CREATE TABLE IF NOT EXISTS admin_activity (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event TEXT NOT NULL,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create indexes for performance
     await this.db.exec('CREATE INDEX IF NOT EXISTS idx_clinics_webhook ON clinics(webhook_url)');
     await this.db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_clinic ON conversation_logs(clinic_id)');
@@ -229,6 +239,11 @@ export class SecureDatabase {
         UPDATE clinics SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
       END
     `);
+  }
+
+  async logAdminActivity(event: string, details?: any): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    await this.db.run(`INSERT INTO admin_activity (event, details) VALUES (?, ?)`, [event, JSON.stringify(details || {})]);
   }
 
   /**

@@ -1000,15 +1000,16 @@ class WebhookAPIServer {
           return res.status(500).json({ success: false, error: 'Admin auth not configured' });
         }
         if (email !== adminEmail) {
-          return res.status(401).json({ success: false, error: 'Invalid credentials' });
+          return res.status(401).json({ success: false, error: 'Invalid credentials (email mismatch)' });
         }
         const bcrypt = require('bcrypt');
         const ok = await bcrypt.compare(password || '', passwordHash);
         if (!ok) {
-          return res.status(401).json({ success: false, error: 'Invalid credentials' });
+          return res.status(401).json({ success: false, error: 'Invalid credentials (password mismatch)' });
         }
         const jwt = require('jsonwebtoken');
         const token = jwt.sign({ sub: adminEmail, role: 'admin' }, jwtSecret, { expiresIn: '8h' });
+        try { await this.database.logAdminActivity('admin_login', { email }); } catch {}
         return res.json({ success: true, data: { token } });
       } catch (e) {
         return res.status(500).json({ success: false, error: 'Login failed' });
@@ -1047,14 +1048,56 @@ class WebhookAPIServer {
           isActive: true
         });
 
-        // Bust caches
+        // Bust caches & log activity
         this.clinicConfigCache.delete(uniqueWebhookId);
         this.clinicAdapterCache.delete(uniqueWebhookId);
+        try { await this.database.logAdminActivity('register_clinic', { uniqueWebhookId, clinicName, shard: apiConfiguration.shard, businessId: apiConfiguration.businessId }); } catch {}
 
         return res.json({ success: true, message: 'Clinic configuration registered successfully', data: { webhookId: uniqueWebhookId } });
       } catch (err: any) {
         console.error('register-clinic error:', err);
         return res.status(500).json({ success: false, error: 'Failed to register clinic' });
+      }
+    });
+
+    // Admin: list clinics
+    this.app.get('/admin/clinics', async (req, res) => {
+      if (!requireAdminAuth(req, res)) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      try {
+        const clinics = await this.database.getAllClinics();
+        const redacted = clinics.map(c => ({ id: c.id, name: c.name, webhookUrl: c.webhookUrl, timezone: c.timezone, isActive: c.isActive, bookingSystem: c.bookingSystem }));
+        return res.json({ success: true, data: redacted });
+      } catch (e) {
+        return res.status(500).json({ success: false, error: 'Failed to list clinics' });
+      }
+    });
+
+    // Admin: deactivate/activate clinic
+    this.app.post('/admin/clinics/:id/toggle', async (req, res) => {
+      if (!requireAdminAuth(req, res)) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      try {
+        const id = req.params.id;
+        const target = await (this.database as any).db?.get('SELECT id, is_active FROM clinics WHERE id = ?', [id]);
+        if (!target) return res.status(404).json({ success:false, error:'Clinic not found' });
+        const newVal = target.is_active ? 0 : 1;
+        await (this.database as any).db?.run('UPDATE clinics SET is_active=? WHERE id=?', [newVal, id]);
+        try { await this.database.logAdminActivity('toggle_clinic', { id, to: !!newVal }); } catch {}
+        this.clinicAdapterCache.clear();
+        this.clinicConfigCache.clear();
+        return res.json({ success: true, data: { id, isActive: !!newVal } });
+      } catch (e) {
+        return res.status(500).json({ success:false, error:'Failed to toggle clinic' });
+      }
+    });
+
+    // Admin: activity log
+    this.app.get('/admin/activity', async (req, res) => {
+      if (!requireAdminAuth(req, res)) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      try {
+        const rows = await (this.database as any).db?.all('SELECT id, event, details, created_at FROM admin_activity ORDER BY id DESC LIMIT 200');
+        return res.json({ success: true, data: rows || [] });
+      } catch (e) {
+        return res.status(500).json({ success: false, error: 'Failed to fetch activity' });
       }
     });
 
